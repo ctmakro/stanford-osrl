@@ -20,6 +20,8 @@ import tensorflow as tf
 import canton as ct
 from canton import *
 
+from observation_processor import process_observation as po
+
 def ResDense(nip):
     c = Can()
     nbp = int(nip/2)
@@ -142,7 +144,7 @@ class nnagent(object):
         c.add(Dense(128,128))
         c.add(Act('lrelu'))
         c.add(Dense(128,64))
-        c.add(Act('elu'))
+        c.add(Act('lrelu'))
         c.add(Dense(64,outputdims))
 
         if self.is_continuous:
@@ -173,7 +175,7 @@ class nnagent(object):
             h2 = Act('lrelu')(h2)
 
             h2 = den3(h2)
-            h2 = Act('elu')(h2)
+            h2 = Act('lrelu')(h2)
 
             q = den4(h2)
             return q
@@ -312,6 +314,7 @@ class nnagent(object):
         # what the agent see as state is a stack of history observations.
 
         observation = env.reset(difficulty=0)
+        observation = po(observation)
         quein(observation) # quein o1
 
         while True and steps <= max_steps:
@@ -343,6 +346,7 @@ class nnagent(object):
 
             # o2, r1,
             observation, reward, done, _info = env.step(action_out)
+            observation = po(observation)
 
             # d1
             isdone = 1 if done else 0
@@ -471,3 +475,47 @@ if __name__=='__main__':
         # e = p.env
         agent.render = True
         agent.play(e,realtime=True,max_steps=-1,noise_level=1e-11)
+
+    def save():
+        agent.save_weights()
+        agent.rpm.save('rpm.pickle')
+
+    def load():
+        agent.load_weights()
+        agent.rpm.load('rpm.pickle')
+
+    def up():
+        # uploading to CrowdAI
+        apikey = open('apikey.txt').read().strip('\n')
+        print('apikey is',apikey)
+
+        import opensim as osim
+        from osim.http.client import Client
+        from osim.env import RunEnv
+
+        # Settings
+        remote_base = "http://grader.crowdai.org:1729"
+        crowdai_token = apikey
+
+        client = Client(remote_base)
+
+        # Create environment
+        observation = client.env_create(crowdai_token)
+        observation = np.array(po(observation))
+        print('environment created! running...')
+        # Run a single step
+        for i in range(1500):
+            [observation, reward, done, info] = client.env_step(
+                [float(i) for i in list(agent.act(observation))],
+                True
+            )
+            observation = np.array(po(observation))
+            # print(observation)
+            if done:
+                observation = client.env_reset()
+                if not observation:
+                    break
+                observation = np.array(po(observation))
+
+        print('submitting...')
+        client.submit()
