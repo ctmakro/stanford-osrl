@@ -1,3 +1,6 @@
 __pycache__
 *.pyc
 *.log
+*.npz
+*.pickle
+apikey.txt
