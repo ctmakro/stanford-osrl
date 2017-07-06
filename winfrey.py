@@ -15,7 +15,7 @@ class wavegraph(object):
 
         self.name = name
         self.imgw = 200
-        self.imgh = 300
+        self.imgh = max(300, dims*12+60 + 20)
 
         self.im = np.zeros((self.imgh,self.imgw,3),dtype='float32')
 

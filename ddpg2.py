@@ -10,8 +10,7 @@ from math import *
 import random
 import time
 
-# from winfrey import wavegraph
-# temporarily disable winfrey :)
+from winfrey import wavegraph
 
 from rpm import rpm # replay memory implementation
 
@@ -138,10 +137,12 @@ class nnagent(object):
     def create_actor_network(self,inputdims,outputdims):
         # add gaussian noise.
         c = Can()
-        c.add(Dense(inputdims,256))
+        c.add(Dense(inputdims,128))
         c.add(Act('lrelu'))
-        c.add(Dense(256,64))
+        c.add(Dense(128,128))
         c.add(Act('lrelu'))
+        c.add(Dense(128,64))
+        c.add(Act('elu'))
         c.add(Dense(64,outputdims))
 
         if self.is_continuous:
@@ -172,7 +173,7 @@ class nnagent(object):
             h2 = Act('lrelu')(h2)
 
             h2 = den3(h2)
-            h2 = Act('lrelu')(h2)
+            h2 = Act('elu')(h2)
 
             q = den4(h2)
             return q
@@ -389,7 +390,7 @@ class nnagent(object):
 
         noise = self.noise_source.ask() * 5 - np.arange(self.outputdims) * 12.0 - 30
 
-        # self.loggraph(np.hstack([disp_actions,noise,q]))
+        self.loggraph(np.hstack([disp_actions,noise,q]))
         # temporarily disabled.
         return actions
 
@@ -445,7 +446,7 @@ if __name__=='__main__':
     # p = playground('BipedalWalker-v2')
     # e = p.env
 
-    e = RunEnv(visualize=True)
+    e = RunEnv(visualize=False)
 
     agent = nnagent(
     e.observation_space,
