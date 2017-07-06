@@ -1,6 +1,10 @@
 # Stanford OpenSim RL NIPS2017
 
-you know, to walk the skeleton. original DDPG code from github.com/ctmakro/gymnastics
+you know, to walk the skeleton. 
+
+original DDPG code from <https://github.com/ctmakro/gymnastics>
+
+more details at <https://github.com/stanfordnmbl/osim-rl>
 
 # Dependencies
 
