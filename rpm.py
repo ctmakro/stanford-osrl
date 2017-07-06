@@ -2,6 +2,8 @@
 import numpy as np
 import random
 
+import pickle
+
 # replay buffer per http://pemami4911.github.io/blog/2016/08/21/ddpg-rl.html
 class rpm(object):
     #replay memory
@@ -42,3 +44,10 @@ class rpm(object):
             if len(k.shape)==1: k.shape+=(1,)
             res.append(k)
         return res
+
+    def save(self, pathname):
+        pickle.dump(self.buffer, open(pathname, 'wb'))
+        print('memory dumped into',pathname)
+    def load(self, pathname):
+        self.buffer = pickle.load(open(pathname, 'rb'))
+        print('memory loaded from',pathname)
