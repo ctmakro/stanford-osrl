@@ -15,7 +15,6 @@ you know, to walk the skeleton. original DDPG code from github.com/ctmakro/gymna
 Assume you want to run osim-rl on Windows w/py35, since TensorFlow support only Python 3.5 on Windows.
 
 1. Build OpenSim yourself (since @kidzik didn't do this for us)
-
   - Install VC++ 2015 build tools. Should not take long
   - CMD
     - Clone the opensim conda builder, then run the build command:
@@ -85,7 +84,6 @@ Assume you want to run osim-rl on Windows w/py35, since TensorFlow support only 
         add `D:\Anaconda3\conda-bld\opensim_1499279773305\work\opensim_build\Release` to your PATH.
 
 2. install osim-rl
-
   - CMD
 
     ```bash
