@@ -89,7 +89,7 @@ Assume you want to run osim-rl on Windows w/py35, since TensorFlow support only 
 
               in `setup.py`, replace `execfile(name)` with `exec(open(name).read())`.
 
-            Then `cd` to the correct path (`D:\Anaconda3\conda-bld\opensim_1499279773305\_b_env\Library\sdk\python`) and manually run `python setup.py install` or `pip install .`
+            Then `cd` to the correct path (`D:\Anaconda3\conda-bld\opensim_1499279773305\_b_env\Library\sdk\python`) and manually run `pip install -e .`
 
       - Now test the OpenSim installation:
           - try `import opensim` in python.
@@ -107,7 +107,7 @@ Assume you want to run osim-rl on Windows w/py35, since TensorFlow support only 
         (chinese users) > set HTTPS_PROXY=whatever_you_use
         > git clone https://github.com/stanfordnmbl/osim-rl.git
         > cd osim-rl
-        > pip install .
+        > pip install -e .
         > cd tests
         > python test.manager.py
         ```
