@@ -45,28 +45,26 @@ observation:
 36-37 muscles
 
 38-40 obstacles
+
+radius of heel and toe ball: 1
+
 '''
 
 def process_observation(observation):
     o = observation # an array
-    pelvisr = o[0]
-    pelvisx = o[1]
-    pelvisy = o[2]
+
+    px = o[1]
+    py = o[2]
     for i in range(7):
-        o[22+i*2+0] -= pelvisx
-        o[22+i*2+1] -= pelvisy
+        o[22+i*2+0] -= px
+        o[22+i*2+1] -= py
 
-    o[18+0] -= pelvisx
-    o[18+1] -= pelvisy
-
-    for i in range(6):
-        o[6+i] /=10
+    o[18] -= px # mass x made relative
 
     o[38]/=100
     o[39]/=10
     o[40]/=10
 
-    o[1]/= 100 # pelvis x is not relevant
-    o[2]/=2 # smaller pelvisy
+    o[1]=0 # abs value of pel x is not relevant
 
     return o
