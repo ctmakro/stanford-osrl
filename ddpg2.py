@@ -135,16 +135,33 @@ class nnagent(object):
 
         sync_target()
 
+        import threading as th
+        self.lock = th.Lock()
+
+        if not hasattr(self,'wavegraph'):
+            num_waves = self.outputdims*2+1
+            def rn():
+                r = np.random.uniform()
+                return 0.2+r*0.4
+            colors = []
+            for i in range(num_waves-1):
+                color = [rn(),rn(),rn()]
+                colors.append(color)
+            colors.append([0.2,0.5,0.9])
+            self.wavegraph = wavegraph(num_waves,'actions/noises/Q',np.array(colors))
+
     # a = actor(s) : predict actions given state
     def create_actor_network(self,inputdims,outputdims):
         # add gaussian noise.
+        rect = Act('lrelu')
+
         c = Can()
         c.add(Dense(inputdims,128))
-        c.add(Act('lrelu'))
-        c.add(Dense(128,128))
-        c.add(Act('lrelu'))
+        c.add(rect)
         c.add(Dense(128,64))
-        c.add(Act('lrelu'))
+        c.add(rect)
+        c.add(Dense(64,64))
+        c.add(rect)
         c.add(Dense(64,outputdims))
 
         if self.is_continuous:
@@ -161,23 +178,27 @@ class nnagent(object):
         c = Can()
         concat = Lambda(lambda x:tf.concat([x[0],x[1]],axis=1))
         # concat state and action
-        den1 = c.add(Dense(inputdims,256))
-        den2 = c.add(Dense(256+actiondims,256))
-        den3 = c.add(Dense(256, 64))
+        den1 = c.add(Dense(inputdims,128))
+        den1b = c.add(Dense(128,64))
+        den2 = c.add(Dense(64+actiondims,64))
+        den3 = c.add(Dense(64, 64))
         den4 = c.add(Dense(64,1))
+
+        rect = Act('lrelu')
 
         def call(i):
             state = i[0]
             action = i[1]
-            h1 = den1(state)
-            h1 = Act('lrelu')(h1)
-            h2 = den2(concat([h1,action]))
-            h2 = Act('lrelu')(h2)
-
-            h2 = den3(h2)
-            h2 = Act('lrelu')(h2)
-
-            q = den4(h2)
+            i = den1(state)
+            i = rect(i)
+            i = den1b(i)
+            i = rect(i)
+            k = concat([i,action])
+            k = den2(k)
+            k = rect(k)
+            k = den3(k)
+            k = rect(k)
+            q = den4(k)
             return q
         c.set_function(call)
         return c
@@ -289,98 +310,74 @@ class nnagent(object):
     # gymnastics
     def play(self,env,max_steps=-1,realtime=False,noise_level=0.): # play 1 episode
         timer = time.time()
+        noise_source = one_fsq_noise()
         max_steps = max_steps if max_steps > 0 else 50000
         steps = 0
         total_reward = 0
 
-        # stack a little history to ensure markov property
-        # LSTM will definitely be used here in the future...
-        # global que # python 2 quirk
-        self.que = np.zeros((self.inputdims,),dtype='float32') # list of recent history actions
+        # removed: state stacking
 
-        if self.observation_stack_factor>1:
-            def quein(observation):
-                # global que # python 2 quirk
-                length = len(observation)
-                self.que[0:-length] = self.que[length:] # left shift
-                self.que[-length:] = np.array(observation)
-
-            def quecopy():
-                return self.que.copy()
-        else:
-            def quein(observation): self.que = np.array(observation)
-            def quecopy():return self.que.view()
-
-        # what the agent see as state is a stack of history observations.
-
-        observation = env.reset(difficulty=0)
+        observation = env.reset()
         observation = po(observation)
-        quein(observation) # quein o1
+        observation = np.array(observation) # quein o1
 
         while True and steps <= max_steps:
             steps +=1
 
-            thisque = quecopy() # s1
+            observation_before_action = observation # s1
 
-            action = self.act(thisque) # a1
+            exploration_noise = noise_source.one((self.outputdims,),noise_level)
+
+            self.lock.acquire() # please do not disrupt.
+            action = self.act(observation_before_action, exploration_noise) # a1
+            self.lock.release()
 
             if self.is_continuous:
                 # add noise to our actions, since our policy by nature is deterministic
-                exploration_noise = self.noise_source.one((self.outputdims,),noise_level)
                 exploration_noise *= self.action_multiplier
                 # print(exploration_noise,exploration_noise.shape)
                 action += exploration_noise
                 action = self.clamper(action)
                 action_out = action
             else:
-                exploration_noise = self.noise_source.one((self.outputdims,),noise_level)
-                exploration_noise *= self.action_multiplier
-                action += exploration_noise
-                # action = self.clamper(action)
-                action = softmax(action)
-                # discretize our actions
-                probabilities = action
-                csprob = np.cumsum(probabilities)
-                action_index = (csprob > np.random.rand()).argmax()
-                action_out = action_index
+                raise NamedException('this version of ddpg is for continuous only.')
 
             # o2, r1,
-            observation, reward, done, _info = env.step(action_out)
+            observation, reward, done, _info = env.step(action_out) # take long time
             observation = po(observation)
+            observation = np.array(observation)
 
             # d1
             isdone = 1 if done else 0
             total_reward += reward
 
-            quein(observation) # quein o2
-            nextque = quecopy() # s2
-
+            self.lock.acquire()
             # feed into replay memory
             if self.training == True:
-                self.feed_one((thisque,action,reward,isdone,nextque)) # s1,a1,r1,isdone,s2
+                self.feed_one((
+                    observation_before_action,action,reward,isdone,observation
+                )) # s1,a1,r1,isdone,s2
+                self.train(verbose=2 if steps==1 else 0)
 
-            if self.render==True and (steps%30==0 or realtime==True):
-                env.render()
+            # if self.render==True and (steps%30==0 or realtime==True):
+            #     env.render()
+            self.lock.release()
             if done :
                 break
-
-            verbose= 2 if steps==1 else 0
-
-            if self.training == True:
-                self.train(verbose=verbose)
 
         # print('episode done in',steps,'steps',time.time()-timer,'second total reward',total_reward)
         totaltime = time.time()-timer
         print('episode done in {} steps in {:.2f} sec, {:.4f} sec/step, got reward :{:.2f}'.format(
         steps,totaltime,totaltime/steps,total_reward
         ))
-
+        self.lock.acquire()
         self.plotter.pushy(total_reward)
-        self.plotter.show()
+        self.lock.release()
+
         return
 
     # one step of action, given observation
-    def act(self,observation):
+    def act(self,observation,curr_noise):
         actor,critic = self.actor,self.critic
         obs = np.reshape(observation,(1,len(observation)))
 
@@ -392,24 +389,13 @@ class nnagent(object):
         disp_actions = (actions-self.action_bias) / self.action_multiplier
         disp_actions = disp_actions * 5 + np.arange(self.outputdims) * 12.0 + 30
 
-        noise = self.noise_source.ask() * 5 - np.arange(self.outputdims) * 12.0 - 30
+        noise = curr_noise * 5 - np.arange(self.outputdims) * 12.0 - 30
 
         self.loggraph(np.hstack([disp_actions,noise,q]))
         # temporarily disabled.
         return actions
 
     def loggraph(self,waves):
-        if not hasattr(self,'wavegraph'):
-            def rn():
-                r = np.random.uniform()
-                return 0.2+r*0.4
-            colors = []
-            for i in range(len(waves)-1):
-                color = [rn(),rn(),rn()]
-                colors.append(color)
-            colors.append([0.2,0.5,0.9])
-            self.wavegraph = wavegraph(len(waves),'actions/noises/Q',np.array(colors))
-
         wg = self.wavegraph
         wg.one(waves.reshape((-1,)))
 
@@ -455,21 +441,43 @@ if __name__=='__main__':
     agent = nnagent(
     e.observation_space,
     e.action_space,
-    discount_factor=.99,
+    discount_factor=.97,
     stack_factor=1,
     train_skip_every=1,
     )
 
     noise_level = 2.
-    def r(ep):
+    noise_decay_rate = 0.005
+
+    from multi import eipool # multiprocessing driven simulation pool
+    ep = eipool(8)
+
+    def playonce():
+        global noise_level
+        env = ep.acq_env()
+        agent.play(env,realtime=False,max_steps=-1,noise_level=noise_level)
+        ep.rel_env(env)
+
+    def playtwice(times):
+        import threading as th
+        threads = [th.Thread(target=playonce,daemon=True) for i in range(times)]
+        for i in threads:
+            i.start()
+        for i in threads:
+            i.join()
+
+        agent.plotter.show()
+
+    def r(ep,times=1):
         global noise_level
         # agent.render = True
         # e = p.env
         for i in range(ep):
-            noise_level *= .99
-            noise_level = max(3e-6, noise_level)
-            print('ep',i,'/',ep,'noise_level',noise_level)
-            agent.play(e,realtime=False,max_steps=-1,noise_level=noise_level)
+            noise_level *= (1-noise_decay_rate)
+            noise_level = max(3e-2, noise_level)
+
+            print('ep',i,'/',ep,'times:',times,'noise_level',noise_level)
+            playtwice(times)
 
     def test():
         # e = p.env
