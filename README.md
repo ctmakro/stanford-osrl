@@ -113,3 +113,18 @@ Assume you want to run osim-rl on Windows w/py35, since TensorFlow support only 
         ```
 
         You should now see the skeleton swinging!
+
+# The simulation is too slow
+- modify `D:\Anaconda3\conda-bld\opensim_1499279773305\work\OpenSim\Simulation\Manager\Manager.cpp` as follows:
+
+    ```c
+    Manager::Manager(Model& model) : Manager(model, true)
+    {
+        SimTK::Integrator *vi = new SimTK::RungeKutta2Integrator(_model->getMultibodySystem());
+        vi->setAccuracy(3e-2); // reduce accuracy saves time
+        _defaultInteg.reset(vi);
+        _integ = *_defaultInteg;
+    }
+    ```
+    
+    then build the whole thing again by running `bld.bat` mentioned above.
