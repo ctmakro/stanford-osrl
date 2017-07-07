@@ -121,7 +121,7 @@ Assume you want to run osim-rl on Windows w/py35, since TensorFlow support only 
     Manager::Manager(Model& model) : Manager(model, true)
     {
         SimTK::Integrator *vi = new SimTK::RungeKutta2Integrator(_model->getMultibodySystem());
-        vi->setAccuracy(1e-1);
+        vi->setAccuracy(3e-2); // reduce accuracy saves time
         _defaultInteg.reset(vi);
         _integ = *_defaultInteg;
     }
