@@ -39,6 +39,8 @@ class ei:
 
     def __del__(self):
         self.pc.send(('exit',))
+        print('(ei)waiting for join...')
+        self.p.join()
 
 class eipool:
     def __init__(self,n=1):
