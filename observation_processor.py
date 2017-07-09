@@ -57,7 +57,7 @@ def process_observation(observation):
     py = o[2]
     for i in range(7):
         o[22+i*2+0] -= px
-        o[22+i*2+1] -= py
+        # o[22+i*2+1] -= py
 
     o[18] -= px # mass x made relative
 
