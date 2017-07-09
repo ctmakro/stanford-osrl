@@ -126,5 +126,7 @@ Assume you want to run osim-rl on Windows w/py35, since TensorFlow support only 
         _integ = *_defaultInteg;
     }
     ```
-    
+
     then build the whole thing again by running `bld.bat` mentioned above.
+
+- parallelize the training environment (see code)
