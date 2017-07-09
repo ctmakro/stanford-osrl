@@ -158,9 +158,9 @@ class nnagent(object):
         c = Can()
         c.add(Dense(inputdims,128))
         c.add(rect)
-        c.add(Dense(128,64))
+        c.add(Dense(128,128))
         c.add(rect)
-        c.add(Dense(64,64))
+        c.add(Dense(128,64))
         c.add(rect)
         c.add(Dense(64,outputdims))
 
@@ -180,8 +180,8 @@ class nnagent(object):
         # concat state and action
         den1 = c.add(Dense(inputdims,128))
         den1b = c.add(Dense(128,64))
-        den2 = c.add(Dense(64+actiondims,64))
-        den3 = c.add(Dense(64, 64))
+        den2 = c.add(Dense(64+actiondims,128))
+        den3 = c.add(Dense(128, 64))
         den4 = c.add(Dense(64,1))
 
         rect = Act('lrelu')
@@ -311,6 +311,10 @@ class nnagent(object):
     def play(self,env,max_steps=-1,realtime=False,noise_level=0.): # play 1 episode
         timer = time.time()
         noise_source = one_fsq_noise()
+
+        for j in range(10):
+            noise_source.one((self.outputdims,),noise_level)
+
         max_steps = max_steps if max_steps > 0 else 50000
         steps = 0
         total_reward = 0
@@ -441,7 +445,7 @@ if __name__=='__main__':
     agent = nnagent(
     e.observation_space,
     e.action_space,
-    discount_factor=.97,
+    discount_factor=.995,
     stack_factor=1,
     train_skip_every=1,
     )
@@ -450,13 +454,13 @@ if __name__=='__main__':
     noise_decay_rate = 0.005
 
     from multi import eipool # multiprocessing driven simulation pool
-    ep = eipool(8)
+    epl = eipool(8)
 
     def playonce():
         global noise_level
-        env = ep.acq_env()
+        env = epl.acq_env()
         agent.play(env,realtime=False,max_steps=-1,noise_level=noise_level)
-        ep.rel_env(env)
+        epl.rel_env(env)
 
     def playtwice(times):
         import threading as th
@@ -465,8 +469,6 @@ if __name__=='__main__':
             i.start()
         for i in threads:
             i.join()
-
-        agent.plotter.show()
 
     def r(ep,times=1):
         global noise_level
@@ -478,6 +480,19 @@ if __name__=='__main__':
 
             print('ep',i,'/',ep,'times:',times,'noise_level',noise_level)
             playtwice(times)
+
+            agent.plotter.show()
+            time.sleep(0.01)
+
+            if (i+1) % 50 == 0:
+                # reset the env to prevent memory leak.
+                global epl
+                tepl = epl
+                epl = eipool(8)
+                del tepl
+
+                # save the training result.
+                save()
 
     def test():
         # e = p.env
