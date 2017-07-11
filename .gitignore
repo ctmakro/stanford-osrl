@@ -4,3 +4,4 @@ __pycache__
 *.npz
 *.pickle
 apikey.txt
+/pretrained

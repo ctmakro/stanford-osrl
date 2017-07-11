@@ -381,7 +381,7 @@ class nnagent(object):
         return
 
     # one step of action, given observation
-    def act(self,observation,curr_noise):
+    def act(self,observation,curr_noise=None):
         actor,critic = self.actor,self.critic
         obs = np.reshape(observation,(1,len(observation)))
 
@@ -390,13 +390,14 @@ class nnagent(object):
         [actions,q] = self.joint_inference(obs)
         actions,q = actions[0],q[0]
 
-        disp_actions = (actions-self.action_bias) / self.action_multiplier
-        disp_actions = disp_actions * 5 + np.arange(self.outputdims) * 12.0 + 30
+        if curr_noise is not None:
+            disp_actions = (actions-self.action_bias) / self.action_multiplier
+            disp_actions = disp_actions * 5 + np.arange(self.outputdims) * 12.0 + 30
 
-        noise = curr_noise * 5 - np.arange(self.outputdims) * 12.0 - 30
+            noise = curr_noise * 5 - np.arange(self.outputdims) * 12.0 - 30
 
-        self.loggraph(np.hstack([disp_actions,noise,q]))
-        # temporarily disabled.
+            self.loggraph(np.hstack([disp_actions,noise,q]))
+            # temporarily disabled.
         return actions
 
     def loggraph(self,waves):
