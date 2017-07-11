@@ -11,7 +11,7 @@ def standalone(conn,visualize=True):
         # msg[0] should be string
 
         if msg[0] == 'reset':
-            obs = e.reset(difficulty=0)
+            obs = e.reset(difficulty=2)
             conn.send(obs)
         elif msg[0] == 'step':
             four = e.step(msg[1])
