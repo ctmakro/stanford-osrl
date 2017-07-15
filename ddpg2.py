@@ -572,6 +572,7 @@ if __name__=='__main__':
             # print(observation)
             if done:
                 observation = client.env_reset()
+                old_observation = None
                 if not observation:
                     break
 
