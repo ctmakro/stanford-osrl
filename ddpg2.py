@@ -21,27 +21,29 @@ import canton as ct
 from canton import *
 
 from observation_processor import process_observation as po
-
-def ResDense(nip):
-    c = Can()
-    nbp = int(nip/2)
-    d0 = c.add(Dense(nip,nbp))
-    d1 = c.add(Dense(nbp,nip))
-    def call(i):
-        inp = i
-        i = d0(i)
-        i = Act('elu')(i)
-        i = d1(i)
-        i = Act('elu')(i)
-        return i+inp
-    c.set_function(call)
-    return c
+from observation_processor import generate_observation as go
 
 def softmax(x):
     """Compute softmax values for each sets of scores in x."""
     ex = np.exp(x)
     return ex / np.sum(ex, axis=0)
 
+class ResDense(Can): # residual dense unit
+    def __init__(self,nip):
+        super().__init__()
+        nbp = int(nip/4)
+        d0 = Dense(nip,nbp)
+        d1 = Dense(nbp,nip)
+        self.d = [d0,d1]
+        self.incan(self.d)
+
+    def __call__(self,i):
+        inp = i
+        i = self.d[0](i)
+        i = Act('lrelu')(i)
+        i = self.d[1](i)
+        i = Act('lrelu')(i)
+        return inp + i
 
 import matplotlib.pyplot as plt
 class plotter:
@@ -67,7 +69,7 @@ class plotter:
 
 class nnagent(object):
     def __init__(self,
-    observation_space,
+    observation_space_dims,
     action_space,
     stack_factor=1,
     discount_factor=.99, # gamma
@@ -82,7 +84,7 @@ class nnagent(object):
         self.train_skip_every = train_skip_every
         self.observation_stack_factor = stack_factor
 
-        self.inputdims = observation_space.shape[0] * self.observation_stack_factor
+        self.inputdims = observation_space_dims * self.observation_stack_factor
         # assume observation_space is continuous
 
         self.is_continuous = True if isinstance(action_space,Box) else False
@@ -157,12 +159,11 @@ class nnagent(object):
 
         c = Can()
         c.add(Dense(inputdims,128))
+        c.add(ResDense(128))
+        c.add(ResDense(128))
         c.add(rect)
-        c.add(Dense(128,128))
-        c.add(rect)
-        c.add(Dense(128,64))
-        c.add(rect)
-        c.add(Dense(64,outputdims))
+        c.add(Lambda(lambda x:x/4))
+        c.add(Dense(128,outputdims))
 
         if self.is_continuous:
             c.add(Act('tanh'))
@@ -178,27 +179,26 @@ class nnagent(object):
         c = Can()
         concat = Lambda(lambda x:tf.concat([x[0],x[1]],axis=1))
         # concat state and action
-        den1 = c.add(Dense(inputdims,128))
-        den1b = c.add(Dense(128,64))
-        den2 = c.add(Dense(64+actiondims,128))
-        den3 = c.add(Dense(128, 64))
-        den4 = c.add(Dense(64,1))
+        den0 = c.add(Dense(inputdims+actiondims,128))
+        den1 = c.add(ResDense(128))
+        den2 = c.add(ResDense(128))
+        den3 = c.add(ResDense(128))
+        den4 = c.add(Dense(128,1))
 
         rect = Act('lrelu')
 
         def call(i):
             state = i[0]
             action = i[1]
-            i = den1(state)
+            i = concat([state,action])
+            i = den0(i)
+            i = den1(i)
+            i = den2(i)
+            i = den3(i)
             i = rect(i)
-            i = den1b(i)
-            i = rect(i)
-            k = concat([i,action])
-            k = den2(k)
-            k = rect(k)
-            k = den3(k)
-            k = rect(k)
-            q = den4(k)
+            i = den4(i)
+
+            q = i
             return q
         c.set_function(call)
         return c
@@ -321,9 +321,13 @@ class nnagent(object):
 
         # removed: state stacking
 
-        observation = env.reset()
-        observation = po(observation)
-        observation = np.array(observation) # quein o1
+        old_observation = None
+        def obg(plain_obs):
+            nonlocal old_observation
+            old_observation = go(plain_obs, old_observation)
+            return np.array(old_observation)
+
+        observation = obg(env.reset())
 
         while True and steps <= max_steps:
             steps +=1
@@ -348,8 +352,8 @@ class nnagent(object):
 
             # o2, r1,
             observation, reward, done, _info = env.step(action_out) # take long time
-            observation = po(observation)
-            observation = np.array(observation)
+
+            observation = obg(observation)
 
             # d1
             isdone = 1 if done else 0
@@ -444,7 +448,7 @@ if __name__=='__main__':
     e = RunEnv(visualize=False)
 
     agent = nnagent(
-    e.observation_space,
+    55,
     e.action_space,
     discount_factor=.995,
     stack_factor=1,
@@ -455,7 +459,7 @@ if __name__=='__main__':
     noise_decay_rate = 0.005
 
     from multi import eipool # multiprocessing driven simulation pool
-    epl = eipool(8)
+    epl = eipool(7)
 
     def playonce():
         global noise_level
@@ -471,6 +475,21 @@ if __name__=='__main__':
         for i in threads:
             i.join()
 
+    def play_ignore():
+        import threading as th
+        t = th.Thread(target=playonce,daemon=True)
+        t.start()
+        # ignore and return.
+
+    def playifavailable():
+        while True:
+            if epl.num_free()<=0:
+                time.sleep(0.5)
+            else:
+                play_ignore()
+                break
+
+
     def r(ep,times=1):
         global noise_level
         # agent.render = True
@@ -479,17 +498,26 @@ if __name__=='__main__':
             noise_level *= (1-noise_decay_rate)
             noise_level = max(3e-2, noise_level)
 
-            print('ep',i,'/',ep,'times:',times,'noise_level',noise_level)
-            playtwice(times)
+            print('ep',i+1,'/',ep,'times:',times,'noise_level',noise_level)
+            # playtwice(times)
+            playifavailable()
 
             agent.plotter.show()
             time.sleep(0.01)
 
-            if (i+1) % 50 == 0:
-                # reset the env to prevent memory leak.
+            if (i+1) % 100 == 0:
                 global epl
+
+                while True: # wait until all free
+                    if epl.all_free():
+                        break
+                    else:
+                        print('wait until all of epl free..')
+                        time.sleep(0.5)
+
+                # reset the env to prevent memory leak.
                 tepl = epl
-                epl = eipool(8)
+                epl = eipool(7)
                 del tepl
 
                 # save the training result.
@@ -525,21 +553,27 @@ if __name__=='__main__':
 
         # Create environment
         observation = client.env_create(crowdai_token)
-        observation = np.array(po(observation))
+        old_observation = None
+        stepno= 0
+
         print('environment created! running...')
         # Run a single step
-        for i in range(1500):
+        while True:
+            observation = go(observation, old_observation)
+            old_observation = observation
+            observation = np.array(observation)
+
             [observation, reward, done, info] = client.env_step(
                 [float(i) for i in list(agent.act(observation))],
                 True
             )
-            observation = np.array(po(observation))
+            stepno+=1
+            print('step',stepno)
             # print(observation)
             if done:
                 observation = client.env_reset()
                 if not observation:
                     break
-                observation = np.array(po(observation))
 
         print('submitting...')
         client.submit()

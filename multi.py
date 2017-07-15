@@ -66,6 +66,15 @@ class eipool:
                 e.occupied = False # freed
         self.lock.release()
 
+    def num_free(self):
+        return sum([0 if e.occupied else 1 for e in self.pool])
+
+    def num_total(self):
+        return len(self.pool)
+
+    def all_free(self):
+        return self.num_free()==self.num_total()
+
     def __del__(self):
         for e in self.pool:
             del e
