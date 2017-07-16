@@ -234,7 +234,8 @@ class nnagent(object):
         # actor is harder to stabilize...
         opt_actor = tf.train.AdamOptimizer(1e-4)
         opt_critic = tf.train.AdamOptimizer(3e-4)
-        # opt_actor = tf.train.MomentumOptimizer(1e-1,momentum=0.9)
+        opt_actor = tf.train.RMSPropOptimizer(1e-3)
+        opt_critic = tf.train.RMSPropOptimizer(1e-3)
         cstep = opt_critic.minimize(critic_loss, var_list=cw)
         astep = opt_actor.minimize(actor_loss, var_list=aw)
 
@@ -433,7 +434,7 @@ if __name__=='__main__':
     e = RunEnv(visualize=False)
 
     agent = nnagent(
-    55,
+    55+7,
     e.action_space,
     discount_factor=.995,
     stack_factor=1,

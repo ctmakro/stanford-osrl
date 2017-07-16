@@ -56,6 +56,9 @@ def process_observation(observation):
 
     px = o[1]
     py = o[2]
+    
+    o = o + [o[22+i*2+1] for i in range(7)]
+
     for i in range(7):
         o[22+i*2+0] -= px
         o[22+i*2+1] -= py
@@ -67,6 +70,7 @@ def process_observation(observation):
     o[40]/=5
 
     o[1]/=100 # abs value of pel x is not relevant
+
 
     return o
 
