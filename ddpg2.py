@@ -32,8 +32,8 @@ class ResDense(Can): # residual dense unit
     def __init__(self,nip):
         super().__init__()
         nbp = int(nip/4)
-        d0 = Dense(nip,nbp)
-        d1 = Dense(nbp,nip)
+        d0 = Dense(nip,nbp,bias=False)
+        d1 = Dense(nbp,nip,bias=False)
         self.d = [d0,d1]
         self.incan(self.d)
 
@@ -158,11 +158,10 @@ class nnagent(object):
         rect = Act('lrelu')
 
         c = Can()
-        c.add(Dense(inputdims,128))
-        c.add(ResDense(128))
-        c.add(ResDense(128))
+        c.add(Dense(inputdims, 128))
         c.add(rect)
-        c.add(Lambda(lambda x:x/4))
+        c.add(Dense(128,128))
+        c.add(rect)
         c.add(Dense(128,outputdims))
 
         if self.is_continuous:
@@ -179,21 +178,26 @@ class nnagent(object):
         c = Can()
         concat = Lambda(lambda x:tf.concat([x[0],x[1]],axis=1))
         # concat state and action
-        den0 = c.add(Dense(inputdims+actiondims,128))
-        den1 = c.add(ResDense(128))
-        den2 = c.add(ResDense(128))
-        den3 = c.add(ResDense(128))
-        den4 = c.add(Dense(128,1))
+        den0 = c.add(Dense(inputdims,128))
+        den1 = c.add(Dense(128, 128))
+        den2 = c.add(Dense(128+actiondims, 128))
+        den3 = c.add(Dense(128,128))
+        den3 = c.add(Dense(128,64))
+        den4 = c.add(Dense(64,1))
 
         rect = Act('lrelu')
 
         def call(i):
             state = i[0]
             action = i[1]
-            i = concat([state,action])
-            i = den0(i)
+            i = den0(state)
+            i = rect(i)
             i = den1(i)
+            i = rect(i)
+
+            i = concat([i,action])
             i = den2(i)
+            i = rect(i)
             i = den3(i)
             i = rect(i)
             i = den4(i)
@@ -295,7 +299,7 @@ class nnagent(object):
         if self.train_counter != 0: # train every few steps
             return
 
-        if memory.size() > total_size * 64:
+        if memory.size() > total_size * 100:
             #if enough samples in memory
             for i in range(self.train_skip_every):
                 # sample randomly a minibatch from memory
@@ -323,9 +327,9 @@ class nnagent(object):
 
         old_observation = None
         def obg(plain_obs):
-            nonlocal old_observation
-            old_observation = go(plain_obs, old_observation)
-            return np.array(old_observation)
+            nonlocal old_observation, steps
+            processed_observation = go(plain_obs, old_observation, step=steps)
+            return np.array(processed_observation)
 
         observation = obg(env.reset())
 
@@ -335,6 +339,7 @@ class nnagent(object):
             observation_before_action = observation # s1
 
             exploration_noise = noise_source.one((self.outputdims,),noise_level)
+            # exploration_noise -= noise_level * 1
 
             self.lock.acquire() # please do not disrupt.
             action = self.act(observation_before_action, exploration_noise) # a1

@@ -52,13 +52,13 @@ radius of heel and toe ball: 0.05
 '''
 
 def process_observation(observation):
-    o = observation # an array
+    o = list(observation) # an array
 
     px = o[1]
     py = o[2]
     for i in range(7):
         o[22+i*2+0] -= px
-        # o[22+i*2+1] -= py
+        o[22+i*2+1] -= py
 
     o[18] -= px # mass x made relative
 
@@ -71,10 +71,21 @@ def process_observation(observation):
     return o
 
 # expand observation from 41 to 41+14 = 55 dims
-def generate_observation(new, old=None):
-    new = process_observation(new)
+def generate_observation(new, old=None, step=0):
+    # deal with old
+    if old is None:
+        old = list(new)
 
-    bodypart_velocities = [(new[i]-old[i] if old is not None else 0) for i in range(22,36)]
+    # calc vel
+    bodypart_velocities = [(new[i]-old[i])/0.01 for i in range(22,36)]
 
-    new = new + bodypart_velocities
-    return new
+    # process new
+    new_processed = process_observation(new)
+    new_processed[1] = (999 - step)/1000
+
+    # substitude old with new
+    for i in range(41):
+        old[i] = new[i]
+
+    # return processed
+    return new_processed + bodypart_velocities
