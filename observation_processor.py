@@ -56,7 +56,7 @@ def process_observation(observation):
 
     px = o[1]
     py = o[2]
-    
+
     o = o + [o[22+i*2+1] for i in range(7)]
 
     for i in range(7):
@@ -92,4 +92,9 @@ def generate_observation(new, old=None, step=0):
         old[i] = new[i]
 
     # return processed
-    return new_processed + bodypart_velocities
+    new_processed = new_processed + bodypart_velocities
+
+    # for i,n in enumerate(new_processed):
+    #     print(i,n)
+
+    return new_processed, old

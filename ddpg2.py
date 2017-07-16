@@ -309,7 +309,7 @@ class nnagent(object):
         old_observation = None
         def obg(plain_obs):
             nonlocal old_observation, steps
-            processed_observation = go(plain_obs, old_observation, step=steps)
+            processed_observation, old_observation = go(plain_obs, old_observation, step=steps)
             return np.array(processed_observation)
 
         observation = obg(env.reset())
