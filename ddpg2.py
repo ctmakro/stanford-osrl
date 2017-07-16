@@ -45,27 +45,7 @@ class ResDense(Can): # residual dense unit
         i = Act('lrelu')(i)
         return inp + i
 
-import matplotlib.pyplot as plt
-class plotter:
-    def __init__(self):
-        plt.ion()
-
-        self.x = []
-        self.y = []
-        self.fig = plt.figure()
-        self.ax = self.fig.add_subplot(1,1,1)
-
-    def pushy(self,y):
-        self.y.append(y)
-        if len(self.x)>0:
-            self.x.append(self.x[-1]+1)
-        else:
-            self.x.append(0)
-
-    def show(self):
-        self.ax.clear()
-        self.ax.plot(self.x,self.y)
-        plt.draw()
+from plotter import interprocess_plotter as plotter
 
 class nnagent(object):
     def __init__(self,
@@ -507,7 +487,6 @@ if __name__=='__main__':
             # playtwice(times)
             playifavailable()
 
-            agent.plotter.show()
             time.sleep(0.01)
 
             if (i+1) % 100 == 0:
