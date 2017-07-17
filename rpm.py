@@ -12,7 +12,7 @@ class rpm(object):
         self.buffer = []
 
     def add(self, obj):
-        if self.size() >= self.buffer_size:
+        while self.size() >= self.buffer_size:
             # self.buffer.popleft()
             # self.buffer = self.buffer[1:]
             self.buffer.pop(0)
