@@ -443,6 +443,7 @@ if __name__=='__main__':
 
     noise_level = 2.
     noise_decay_rate = 0.005
+    noise_floor = 0.1
 
     from multi import eipool # multiprocessing driven simulation pool
     epl = eipool(7)
@@ -482,7 +483,7 @@ if __name__=='__main__':
         # e = p.env
         for i in range(ep):
             noise_level *= (1-noise_decay_rate)
-            noise_level = max(3e-2, noise_level)
+            noise_level = max(noise_floor, noise_level)
 
             print('ep',i+1,'/',ep,'times:',times,'noise_level',noise_level)
             # playtwice(times)
