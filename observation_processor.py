@@ -41,7 +41,7 @@ observation:
 18-19 mass_pos xy
 20-21 mass_vel xy
 
-22-(22+7x2=35) bodypart_positions(x,y)
+22-(22+7x2-1=35) bodypart_positions(x,y)
 
 36-37 muscles psoas
 
@@ -57,19 +57,25 @@ def process_observation(observation):
     px = o[1]
     py = o[2]
 
-    o = o + [o[22+i*2+1] for i in range(7)]
+    pvx = o[4]
+    pvy = o[5]
 
-    for i in range(7):
+    o = o + [o[22+i*2+1] for i in range(7)] # range: 42-54
+
+    for i in range(7): # head pelvis torso, toes and taluses
         o[22+i*2+0] -= px
         o[22+i*2+1] -= py
 
-    o[18] -= px # mass x made relative
+    o[18] -= px # mass pos xy made relative
+    o[19] -= py
+    o[20] -= pvx
+    o[21] -= pvy
 
     o[38]/=100
     o[39]/=5
     o[40]/=5
 
-    o[1]/=100 # abs value of pel x is not relevant
+    o[1]=0 # abs value of pel x is not relevant
 
 
     return o
@@ -80,16 +86,17 @@ def generate_observation(new, old=None, step=0):
     if old is None:
         old = list(new)
 
-    # calc vel
-    bodypart_velocities = [(new[i]-old[i])/0.01 for i in range(22,36)]
-
     # process new
     new_processed = process_observation(new)
-    new_processed[1] = (999 - step)/1000
+
+    # calc vel
+    bodypart_velocities = [(new_processed[i]-old[i])/0.01 for i in range(22,36)]
+
+    # new_processed[1] = (999 - step)/1000
 
     # substitude old with new
     for i in range(41):
-        old[i] = new[i]
+        old[i] = new_processed[i]
 
     # return processed
     new_processed = new_processed + bodypart_velocities

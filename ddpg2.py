@@ -28,6 +28,19 @@ def softmax(x):
     ex = np.exp(x)
     return ex / np.sum(ex, axis=0)
 
+class TriggerBox():
+    def __init__(self,msg,texts,callbacks):
+        def show():
+            import pymsgbox
+            while True:
+                chosen = pymsgbox.confirm(text=msg,title='triggers',buttons=texts)
+                for i,t in enumerate(texts):
+                    if t==chosen:
+                        print(i,t,'chosen...')
+                        callbacks[i]()
+        import threading as th
+        th.Thread(target=show, daemon=True).start()
+
 class ResDense(Can): # residual dense unit
     def __init__(self,nip):
         super().__init__()
@@ -140,9 +153,9 @@ class nnagent(object):
         c = Can()
         c.add(Dense(inputdims, 128))
         c.add(rect)
-        c.add(Dense(128,128))
+        c.add(Dense(128,64))
         c.add(rect)
-        c.add(Dense(128,outputdims))
+        c.add(Dense(64,outputdims))
 
         if self.is_continuous:
             c.add(Act('tanh'))
@@ -159,9 +172,8 @@ class nnagent(object):
         concat = Lambda(lambda x:tf.concat([x[0],x[1]],axis=1))
         # concat state and action
         den0 = c.add(Dense(inputdims,128))
-        den1 = c.add(Dense(128, 128))
-        den2 = c.add(Dense(128+actiondims, 128))
-        den3 = c.add(Dense(128,128))
+        den1 = c.add(Dense(128, 64))
+        den2 = c.add(Dense(64+actiondims, 128))
         den3 = c.add(Dense(128,64))
         den4 = c.add(Dense(64,1))
 
@@ -233,9 +245,9 @@ class nnagent(object):
         # optimizer on
         # actor is harder to stabilize...
         opt_actor = tf.train.AdamOptimizer(1e-4)
-        opt_critic = tf.train.AdamOptimizer(3e-4)
-        opt_actor = tf.train.RMSPropOptimizer(1e-3)
-        opt_critic = tf.train.RMSPropOptimizer(1e-3)
+        opt_critic = tf.train.AdamOptimizer(2e-4)
+        # opt_actor = tf.train.RMSPropOptimizer(1e-3)
+        # opt_critic = tf.train.RMSPropOptimizer(1e-3)
         cstep = opt_critic.minimize(critic_loss, var_list=cw)
         astep = opt_actor.minimize(actor_loss, var_list=aw)
 
@@ -280,7 +292,7 @@ class nnagent(object):
         if self.train_counter != 0: # train every few steps
             return
 
-        if memory.size() > total_size * 100:
+        if memory.size() > total_size * 200:
             #if enough samples in memory
             for i in range(self.train_skip_every):
                 # sample randomly a minibatch from memory
@@ -436,7 +448,7 @@ if __name__=='__main__':
     agent = nnagent(
     55+7,
     e.action_space,
-    discount_factor=.995,
+    discount_factor=.99,
     stack_factor=1,
     train_skip_every=1,
     )
@@ -445,8 +457,17 @@ if __name__=='__main__':
     noise_decay_rate = 0.005
     noise_floor = 0.1
 
+    show_sim = False
+
     from multi import eipool # multiprocessing driven simulation pool
-    epl = eipool(7)
+    epl = None
+    def newpool():
+        global epl,show_sim
+        tepl = epl
+        epl = eipool(6,showfirst=show_sim)
+        del tepl
+
+    newpool()
 
     def playonce():
         global noise_level
@@ -476,12 +497,26 @@ if __name__=='__main__':
                 play_ignore()
                 break
 
+    stopsimflag = False
+    def stopsim():
+        global stopsimflag
+        print('stopsim called')
+        stopsimflag = True
+
+    tb = TriggerBox('Press a button to do something.',
+        ['stop simulation'],
+        [stopsim])
 
     def r(ep,times=1):
-        global noise_level
+        global noise_level,stopsimflag
         # agent.render = True
         # e = p.env
         for i in range(ep):
+            if stopsimflag:
+                stopsimflag = False
+                print('(run) stop signal received, stop at ep',i+1)
+                break
+
             noise_level *= (1-noise_decay_rate)
             noise_level = max(noise_floor, noise_level)
 
@@ -502,9 +537,7 @@ if __name__=='__main__':
                         time.sleep(0.5)
 
                 # reset the env to prevent memory leak.
-                tepl = epl
-                epl = eipool(7)
-                del tepl
+                newpool()
 
                 # save the training result.
                 save()

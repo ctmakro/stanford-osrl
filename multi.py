@@ -43,9 +43,9 @@ class ei:
         self.p.join()
 
 class eipool:
-    def __init__(self,n=1):
+    def __init__(self,n=1,showfirst=True):
         import threading as th
-        self.pool = [ei(visualize=(True if i==0 else False)) for i in range(n)]
+        self.pool = [ei(visualize=(True if i==0 and showfirst else False)) for i in range(n)]
         self.lock = th.Lock()
 
     def acq_env(self):
