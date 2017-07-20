@@ -10,6 +10,8 @@ more details at <https://github.com/stanfordnmbl/osim-rl>
 
   - Python 3.5
   - TF
+  - matplotlib
+  - pymsgbox (act as a stop button instead of using ctrl-c)
   - Canton
   - numpy, gym
   - osim-rl
