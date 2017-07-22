@@ -457,7 +457,7 @@ if __name__=='__main__':
     noise_decay_rate = 0.005
     noise_floor = 0.1
 
-    show_sim = False
+    show_sim = True
 
     from multi import eipool # multiprocessing driven simulation pool
     epl = None
@@ -572,26 +572,39 @@ if __name__=='__main__':
 
         # Create environment
         observation = client.env_create(crowdai_token)
-        old_observation = None
+        # old_observation = None
         stepno= 0
+        epino = 0
+        total_reward = 0
+        old_observation = None
+        def obg(plain_obs):
+            nonlocal old_observation
+            processed_observation, old_observation = go(plain_obs, old_observation, step=0)
+            return np.array(processed_observation)
+
 
         print('environment created! running...')
         # Run a single step
         while True:
-            observation = go(observation, old_observation)
-            old_observation = observation
-            observation = np.array(observation)
+            proc_observation = obg(observation)
 
             [observation, reward, done, info] = client.env_step(
-                [float(i) for i in list(agent.act(observation))],
+                [float(i) for i in list(agent.act(proc_observation))],
                 True
             )
             stepno+=1
-            print('step',stepno)
+            total_reward+=reward
+            print('step',stepno,'total reward',total_reward)
             # print(observation)
             if done:
                 observation = client.env_reset()
                 old_observation = None
+
+                print('>>>>>>>episode',epino,' DONE after',stepno,'got_reward',total_reward)
+                total_reward = 0
+                stepno = 0
+                epino+=1
+
                 if not observation:
                     break
 
