@@ -1,15 +1,17 @@
 from multiprocessing import Process, Pipe
 
-def remote_plotter(conn):
+def remote_plotter(conn,num_lines):
     import matplotlib.pyplot as plt
     import time
     import threading as th
 
     class plotter:
-        def __init__(self):
+        def __init__(self,num_lines=1):
             self.lock = th.Lock()
             self.x = []
             self.y = []
+            self.num_lines = num_lines
+            self.ys = [[] for i in range(num_lines)]
 
             self.time = time.time()
 
@@ -21,7 +23,8 @@ def remote_plotter(conn):
         def show(self):
             self.ax.clear()
             self.lock.acquire()
-            self.ax.plot(self.x,self.y)
+            for y in self.ys:
+                self.ax.plot(self.x,y)
             self.lock.release()
             plt.draw()
 
@@ -34,7 +37,18 @@ def remote_plotter(conn):
                 self.x.append(0)
             self.lock.release()
 
-    p = plotter()
+        def pushys(self,ys):
+            self.lock.acquire()
+            for idx in range(self.num_lines):
+                self.ys[idx].append(ys[idx])
+
+            if len(self.x)>0:
+                self.x.append(self.x[-1]+1)
+            else:
+                self.x.append(0)
+            self.lock.release()
+
+    p = plotter(num_lines)
 
     endflag = False
     def msgloop():
@@ -44,8 +58,8 @@ def remote_plotter(conn):
             # messages should be tuples,
             # msg[0] should be string
 
-            if msg[0] == 'pushy':
-                p.pushy(msg[1])
+            if msg[0] == 'pushys':
+                p.pushys(msg[1])
             elif msg[0] == 'show':
                 p.show()
             else:
@@ -77,13 +91,13 @@ def remote_plotter(conn):
             return
 
 class interprocess_plotter:
-    def __init__(self):
+    def __init__(self,num_lines=1):
         self.pc, cc = Pipe()
-        self.p = Process(target = remote_plotter, args=(cc,), daemon=True)
+        self.p = Process(target = remote_plotter, args=(cc,num_lines), daemon=True)
         self.p.start()
 
-    def pushy(self,y):
-        self.pc.send(('pushy', y))
+    def pushys(self,ys):
+        self.pc.send(('pushys', ys))
 
     def show(self):
         self.pc.send(('show',))

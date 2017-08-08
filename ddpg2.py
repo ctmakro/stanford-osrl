@@ -69,7 +69,7 @@ class nnagent(object):
     train_skip_every=1,
     ):
         self.rpm = rpm(1000000) # 1M history
-        self.plotter = plotter()
+        self.plotter = plotter(num_lines=2)
         self.render = True
         self.training = True
         self.noise_source = one_fsq_noise()
@@ -377,7 +377,8 @@ class nnagent(object):
         steps,totaltime,totaltime/steps,total_reward
         ))
         self.lock.acquire()
-        self.plotter.pushy(total_reward)
+        self.plotter.pushys([total_reward,noise_level])
+        # self.noiseplotter.pushy(noise_level)
         self.lock.release()
 
         return
