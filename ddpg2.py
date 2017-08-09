@@ -292,7 +292,7 @@ class nnagent(object):
         if self.train_counter != 0: # train every few steps
             return
 
-        if memory.size() > total_size * 200:
+        if memory.size() > total_size * 64:
             #if enough samples in memory
             for i in range(self.train_skip_every):
                 # sample randomly a minibatch from memory
@@ -457,8 +457,10 @@ if __name__=='__main__':
     noise_level = 2.
     noise_decay_rate = 0.005
     noise_floor = 0.1
+    noise_level = 3.
+    noise_floor = 0.01
 
-    show_sim = True
+    show_sim = False
 
     from multi import eipool # multiprocessing driven simulation pool
     epl = None
