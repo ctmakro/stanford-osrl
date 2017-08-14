@@ -10,13 +10,25 @@ class rpm(object):
     def __init__(self,buffer_size):
         self.buffer_size = buffer_size
         self.buffer = []
+        self.index = 0
 
     def add(self, obj):
-        while self.size() >= self.buffer_size:
+        if self.size() > self.buffer_size:
             # self.buffer.popleft()
             # self.buffer = self.buffer[1:]
-            self.buffer.pop(0)
-        self.buffer.append(obj)
+            # self.buffer.pop(0)
+
+            #trim
+            print('buffer size larger than set value, trimming...')
+            self.buffer = self.buffer[(self.size()-self.buffer_size):]
+
+        elif self.size() == self.buffer_size:
+            self.buffer[self.index] = obj
+            self.index += 1
+            self.index %= self.buffer_size
+
+        else:
+            self.buffer.append(obj)
 
     def size(self):
         return len(self.buffer)
@@ -46,8 +58,8 @@ class rpm(object):
         return res
 
     def save(self, pathname):
-        pickle.dump(self.buffer, open(pathname, 'wb'))
+        pickle.dump([self.buffer,self.index], open(pathname, 'wb'))
         print('memory dumped into',pathname)
     def load(self, pathname):
-        self.buffer = pickle.load(open(pathname, 'rb'))
+        [self.buffer,self.index] = pickle.load(open(pathname, 'rb'))
         print('memory loaded from',pathname)
