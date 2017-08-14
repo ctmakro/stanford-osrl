@@ -1,8 +1,54 @@
 from multiprocessing import Process, Pipe
 
+# FAST ENV
+
+# this is a environment wrapper. it wraps the RunEnv and provide interface similar to it. The wrapper do a lot of pre and post processing (to make the RunEnv more trainable), so we don't have to do them in the main program.
+
+from observation_processor import generate_observation as go
+import numpy as np
+
+class fastenv:
+    def __init__(self,e,skipcount):
+        self.e = e
+        self.stepcount = 0
+
+        self.old_observation = None
+        self.skipcount = skipcount # 4
+
+    def obg(self,plain_obs):
+        # observation generator
+        # derivatives of observations extracted here.
+        processed_observation, self.old_observation = go(plain_obs, self.old_observation, step=self.stepcount)
+        return np.array(processed_observation)
+
+    def step(self,action):
+        action = [float(i) for i in action]
+        sr = 0
+        for j in range(self.skipcount):
+            self.stepcount+=1
+            o,r,d,i = self.e.step(action)
+            o = self.obg(o)
+            sr += r
+
+            if d == True:
+                break
+
+        return o,sr,d,i
+
+    def reset(self):
+        self.stepcount=0
+        self.old_observation = None
+
+        o = self.e.reset()
+        # o = self.e.reset(difficulty=2)
+        o = self.obg(o)
+        return o
+
+
 def standalone(conn,visualize=True):
     from osim.env import RunEnv
-    e = RunEnv(visualize=visualize)
+    re = RunEnv(visualize=visualize)
+    e = fastenv(re,4)
 
     while True:
         msg = conn.recv()
@@ -11,7 +57,7 @@ def standalone(conn,visualize=True):
         # msg[0] should be string
 
         if msg[0] == 'reset':
-            obs = e.reset(difficulty=2)
+            obs = e.reset()
             conn.send(obs)
         elif msg[0] == 'step':
             four = e.step(msg[1])
@@ -21,7 +67,7 @@ def standalone(conn,visualize=True):
             del e
             return
 
-class ei:
+class ei: # Environment Instance
     def __init__(self,visualize=True):
         self.pc, self.cc = Pipe()
         self.p = Process(target = standalone, args=(self.cc, visualize), daemon=True)
@@ -42,7 +88,7 @@ class ei:
         print('(ei)waiting for join...')
         self.p.join()
 
-class eipool:
+class eipool: # Environment Instance Pool
     def __init__(self,n=1,showfirst=True):
         import threading as th
         self.pool = [ei(visualize=(True if i==0 and showfirst else False)) for i in range(n)]
