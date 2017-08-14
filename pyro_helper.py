@@ -2,6 +2,8 @@
 
 import Pyro4 as p4
 
+p4.config.HOST = '0.0.0.0'
+
 def pyro_connect(address,name):
     uri = 'PYRO:'+name+'@'+address
     return p4.Proxy(uri)
