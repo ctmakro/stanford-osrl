@@ -9,4 +9,6 @@ class TriggerBox():
                         print(i,t,'chosen...')
                         callbacks[i]()
         import threading as th
-        th.Thread(target=show, daemon=True).start()
+        t = th.Thread(target=show)
+        t.daemon = True
+        t.start()
