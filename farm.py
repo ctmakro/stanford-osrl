@@ -158,7 +158,8 @@ class farm:
     def forcerenew(self,n=None):
         print('(farm) forced pool renew')
 
-        del self.eip
+        if hasattr(self,'eip'): # if eip exists
+            del self.eip
         self.eip = eipool(ncpu if n is None else n)
 
 
