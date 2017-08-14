@@ -40,9 +40,9 @@ class ei: # Environment Instance
         self.pc, self.cc = Pipe()
         self.p = Process(
             target = standalone_headless_isolated,
-            args=(self.cc,),
-            daemon=True
+            args=(self.cc,)
         )
+        self.p.daemon = True
         self.p.start()
         self.occupied = False
 
