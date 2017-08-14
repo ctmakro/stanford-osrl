@@ -114,7 +114,7 @@ class eipool: # Environment Instance Pool
 class farm:
     def __init__(self):
         # on init, create a pool
-        # self.renew()
+        self.forcerenew()
         pass
 
     def acq(self,n=None):
