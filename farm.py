@@ -117,7 +117,8 @@ class farm:
         # self.renew()
         pass
 
-    def acq(self):
+    def acq(self,n=None):
+        self.renew_if_needed(n)
         result = self.eip.acq_env()
         if result == False:
             return False
@@ -141,6 +142,11 @@ class farm:
         if e == False: return e
 
         return e.reset()
+
+    def renew_if_needed(self,n=None):
+        if not hasattr(self,'eip'):
+            print('(farm) renew because no eipool present')
+            self.renew(n)
 
     # recreate the pool
     def renew(self,n=None):
