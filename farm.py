@@ -114,8 +114,8 @@ class eipool: # Environment Instance Pool
 class farm:
     def __init__(self):
         # on init, create a pool
-        print('(farm) pool creating')
-        self.renew()
+        # self.renew()
+        pass
 
     def acq(self):
         result = self.eip.acq_env()
@@ -145,6 +145,7 @@ class farm:
     # recreate the pool
     def renew(self,n=None):
         global ncpu
+        print('(farm) natural pool renew')
 
         if hasattr(self,'eip'): # if eip exists
             while not self.eip.all_free(): # wait until all free
@@ -155,6 +156,8 @@ class farm:
         self.eip = eipool(ncpu if n is None else n)
 
     def forcerenew(self,n=None):
+        print('(farm) forced pool renew')
+
         del self.eip
         self.eip = eipool(ncpu if n is None else n)
 
