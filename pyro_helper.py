@@ -3,7 +3,7 @@
 import Pyro4 as p4
 
 p4.config.HOST = '0.0.0.0'
-p4.config.COMMTIMEOUT = 30.0
+p4.config.COMMTIMEOUT = 200.0 # 200 seconds timeout
 # p4.config.MAX_RETRIES = 2
 
 def pyro_connect(address,name):
