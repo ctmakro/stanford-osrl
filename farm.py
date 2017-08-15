@@ -4,7 +4,7 @@
 # a farm should consist of a pool of instances
 # and expose those instances as one giant callable class
 
-import multiprocessing,time
+import multiprocessing,time,random
 from multiprocessing import Process, Pipe
 from osim.env import RunEnv
 
@@ -33,7 +33,7 @@ def standalone_headless_isolated(conn):
             del e
             return
 
-eid = 0
+eid = int(random.random()*1000)
 # class that manages the interprocess communication and expose itself as a RunEnv.
 class ei: # Environment Instance
     def __init__(self):
