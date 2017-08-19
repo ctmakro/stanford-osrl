@@ -140,16 +140,11 @@ Update: this is not the goto choice since it introduce bias. your agent may not 
 # Visualize in environments without a graphic card (i.e. on cloud)
 
 - Windows users:
-
-    - download precompiled Mesa3D for Windows at https://github.com/pal1000/mesa-dist-win/releases. 
-    - Self-extract that on your remote machine, in my case Windows Server 2008 R2.
-    - Run the extracted `quickdeploy.cmd`.
-        I installed `opensim` for Py27 via a conda package built by kidzik (as per instructions on github/stanfordnmbl/osim-rl/README), 
-        into a conda virtual environment called `osrl`, therefore the `simbody-visualizer.exe` is located in
-        `c:\programdata\miniconda3\envs\osrl\`. 
-        Paste that path into the CMD window and let the `quickdeploy.cmd` do the rest for you. 
+    - download precompiled Mesa3D for Windows at <https://github.com/pal1000/mesa-dist-win/releases>. 
+    - Self-extract that on your remote machine, in my case Windows Server 2008 R2. 
+    
+    - Run the extracted `quickdeploy.cmd`. I installed `opensim` for Py27 via a conda package built by kidzik (as per instructions on github/stanfordnmbl/osim-rl/README), into a conda virtual environment called `osrl`, therefore the `simbody-visualizer.exe` is located in `c:\programdata\miniconda3\envs\osrl\`. Paste that path into the CMD window and let the `quickdeploy.cmd` do the rest for you. 
     - Now you can start RunEnv(visualize=True) without getting any errors! Mesa3D just emulated OpenGL for you.
     
 - Linux users:
-
-    Not much I could help, but the approach should be the same: if OpenGL is not supported, emulate it.
+    - Not much I could help, but the approach should be the same: if OpenGL is not supported, emulate it.
