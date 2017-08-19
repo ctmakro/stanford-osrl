@@ -117,6 +117,9 @@ Assume you want to run osim-rl on Windows w/py35, since TensorFlow support only 
         You should now see the skeleton swinging!
 
 # The simulation is too slow
+
+Update: this is not the goto choice since it introduce bias. your agent may not peform well during submission.
+
 - modify `D:\Anaconda3\conda-bld\opensim_1499279773305\work\OpenSim\Simulation\Manager\Manager.cpp` as follows:
 
     ```c
@@ -132,3 +135,15 @@ Assume you want to run osim-rl on Windows w/py35, since TensorFlow support only 
     then build the whole thing again by running `bld.bat` mentioned above.
 
 - parallelize the training environment (see code)
+
+# Visualize in an environment without a graphic card (i.e. on cloud)
+
+- Windows users:
+
+  download precompiled Mesa3D for Windows at https://github.com/pal1000/mesa-dist-win/releases. 
+  
+  Self-extract that on your remote machine, in my case Windows Server 2008 R2.
+  
+  Run the extracted `quickdeploy.cmd`. I installed `opensim` for Py27 via a conda package built by kidzik (as per instructions on github/stanfordnmbl/osim-rl/README), into a conda virtual environment called `osrl`, therefore the `simbody-visualizer.exe` is located in `c:\programdata\miniconda3\envs\osrl\`. Paste that path into the CMD window and let the `quickdeploy.cmd` do the rest for you.
+  
+  Now you can start RunEnv(visualize=True) without getting any errors! Mesa3D just emulated OpenGL for you.
