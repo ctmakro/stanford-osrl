@@ -18,6 +18,9 @@ failures = [0 for i in range(len(capacities))]
 total_capacity = sum(capacities)
 
 class remoteEnv:
+    def pretty(self,s):
+        print(('(remoteEnv) {} ').format(self.id)+str(s))
+
     def __init__(self,fp,id): # fp = farm proxy
         self.fp = fp
         self.id = id
@@ -33,21 +36,27 @@ class remoteEnv:
             try:
                 self.fp.rel(self.id)
                 break
-            except:
+            except Exception as e:
+                self.pretty('exception caught on rel()')
+                self.pretty(e)
                 pass
+
         self.fp._pyroRelease()
 
 class farmer:
+    def pretty(self,s):
+        print('(farmer) '+str(s))
+
     def __init__(self):
         for idx,address in enumerate(addresses):
             fp = pyro_connect(address,'farm')
-            print('(farmer) forced renewing... '+address)
+            self.pretty('forced renewing... '+address)
             try:
                 fp.forcerenew(capacities[idx])
-                print('(farmer) fp.forcerenew() success on '+address)
+                self.pretty('fp.forcerenew() success on '+address)
             except Exception as e:
-                print('(farmer) fp.forcerenew() failed on '+address)
-                print(e)
+                self.pretty('fp.forcerenew() failed on '+address)
+                self.pretty(e)
                 fp._pyroRelease()
                 continue
             fp._pyroRelease()
@@ -73,8 +82,9 @@ class farmer:
                 try:
                     result = fp.acq(capacity)
                 except Exception as e:
-                    print('(farmer) fp.acq() failed on '+address)
-                    print(e)
+                    self.pretty('fp.acq() failed on '+address)
+                    self.pretty(e)
+
                     fp._pyroRelease()
                     failures[idx] += 4
                     continue
@@ -85,22 +95,23 @@ class farmer:
                     continue
                 else: # result is an id
                     id = result
-                    re = remoteEnv(fp,id) # build remoteEnv around the proxy
-                    print('(farmer) got one on '+address+' '+str(id))
-                    return re
+                    renv = remoteEnv(fp,id) # build remoteEnv around the proxy
+                    self.pretty('got one on '+address+' '+str(id))
+                    return renv
 
         # if none of the farms has free ei:
         return False
 
-    def renew(self):
-        for idx,address in enumerate(addresses):
-            fp = pyro_connect(address,'farm')
-            try:
-                fp.renew(capacities[idx])
-            except Exception as e:
-                print('(farmer) fp.renew() failed on '+address)
-                print(e)
-                fp._pyroRelease()
-                continue
-            print('(farmer) '+address+' renewed.')
-            fp._pyroRelease()
+    # the following is commented out. should not use.
+    # def renew(self):
+    #     for idx,address in enumerate(addresses):
+    #         fp = pyro_connect(address,'farm')
+    #         try:
+    #             fp.renew(capacities[idx])
+    #         except Exception as e:
+    #             print('(farmer) fp.renew() failed on '+address)
+    #             print(e)
+    #             fp._pyroRelease()
+    #             continue
+    #         print('(farmer) '+address+' renewed.')
+    #         fp._pyroRelease()
