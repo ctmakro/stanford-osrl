@@ -15,12 +15,15 @@ ncpu = multiprocessing.cpu_count()
 def standalone_headless_isolated(conn,plock):
     # locking to prevent mixed-up printing.
     plock.acquire()
+    print('starting headless...',conn)
     try:
+        import traceback
         from osim.env import RunEnv
         e = RunEnv(visualize=False)
     except Exception as e:
         print('error on start of standalone')
-        print(e)
+        traceback.print_exc()
+
         plock.release()
         return
     else:
@@ -29,6 +32,7 @@ def standalone_headless_isolated(conn,plock):
     def report(e):
         # a way to report errors ( since you can't just throw them over a pipe )
         # e should be a string
+        print('(standalone) got error!!!')
         conn.send(('error',e))
 
     try:
@@ -36,7 +40,7 @@ def standalone_headless_isolated(conn,plock):
             msg = conn.recv()
             # messages should be tuples,
             # msg[0] should be string
-            if type(msg) is not tuple:
+            if not isinstance(msg,tuple):
                 raise Exception('pipe message received by headless is not a tuple')
 
             if msg[0] == 'reset':
@@ -50,6 +54,7 @@ def standalone_headless_isolated(conn,plock):
                 del e
                 break
     except Exception as e:
+        traceback.print_exc()
         report(str(e))
 
     return # end process
@@ -79,6 +84,8 @@ class ei: # Environment Instance
         self.pretty('instance creating')
 
         self.newproc()
+        import threading as th
+        self.lock = th.Lock()
 
     def timer_update(self):
         self.last_interaction = time.time()
@@ -87,8 +94,8 @@ class ei: # Environment Instance
         if self.occupied == False:
             return False
         else:
-            if time.time() - self.last_interaction > 301:
-                # if no interaction for more than 5 minutes
+            if time.time() - self.last_interaction > 361:
+                # if no interaction for more than 6 minutes
                 self.pretty('no interaction for too long, self-releasing now. applying for a new id.')
 
                 self.id = get_eid() # apply for a new id.
@@ -101,7 +108,14 @@ class ei: # Environment Instance
                 return True
 
     def occupy(self):
-        self.occupied = True
+        self.lock.acquire()
+        if self.is_occupied() == False:
+            self.occupied = True
+            self.lock.release()
+            return True # on success
+        else:
+            self.lock.release()
+            return False # failed
 
     def release(self):
         self.occupied = False
@@ -133,7 +147,7 @@ class ei: # Environment Instance
     def recv(self):
         # receive and detect if we got any errors
         r = self.pc.recv()
-        if type(r) is tuple:
+        if isinstance(r,tuple):
             if r[0] == 'error':
                 # read the exception string
                 e == r[1]
@@ -212,8 +226,7 @@ class eipool: # Environment Instance Pool
     def acq_env(self):
         self.lock.acquire()
         for e in self.pool:
-            if e.is_occupied() == False:
-                e.occupy()
+            if e.occupy() == True: # successfully occupied an environment
                 self.lock.release()
                 return e # return the envinstance
 
@@ -227,14 +240,14 @@ class eipool: # Environment Instance Pool
                 e.release() # freed
         self.lock.release()
 
-    def num_free(self):
-        return sum([0 if e.is_occupied() else 1 for e in self.pool])
-
-    def num_total(self):
-        return len(self.pool)
-
-    def all_free(self):
-        return self.num_free()==self.num_total()
+    # def num_free(self):
+    #     return sum([0 if e.is_occupied() else 1 for e in self.pool])
+    #
+    # def num_total(self):
+    #     return len(self.pool)
+    #
+    # def all_free(self):
+    #     return self.num_free()==self.num_total()
 
     def get_env_by_id(self,id):
         for e in self.pool:
@@ -249,6 +262,7 @@ class eipool: # Environment Instance Pool
 # farm
 # interface with eipool via eids.
 # ! this class is a singleton. must be made thread-safe.
+import traceback
 class farm:
     def pretty(self,s):
         print(('(farm) ')+str(s))
@@ -283,7 +297,12 @@ class farm:
             self.pretty(str(id)+' not found on step(), might already be released')
             return False
 
-        return e.step(actions)
+        try:
+            ordi = e.step(actions)
+            return ordi
+        except Exception as e:
+            traceback.print_exc()
+            raise e
 
     def reset(self,id):
         e = self.eip.get_env_by_id(id)
@@ -291,7 +310,12 @@ class farm:
             self.pretty(str(id)+' not found on reset(), might already be released')
             return False
 
-        return e.reset()
+        try:
+            oo = e.reset()
+            return oo
+        except Exception as e:
+            traceback.print_exc()
+            raise e
 
     def renew_if_needed(self,n=None):
         self.lock.acquire()
