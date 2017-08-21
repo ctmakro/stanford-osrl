@@ -30,22 +30,7 @@ def softmax(x):
 
 from triggerbox import TriggerBox
 
-class ResDense(Can): # residual dense unit
-    def __init__(self,nip):
-        super().__init__()
-        nbp = int(nip/4)
-        d0 = Dense(nip,nbp,bias=False)
-        d1 = Dense(nbp,nip,bias=False)
-        self.d = [d0,d1]
-        self.incan(self.d)
-
-    def __call__(self,i):
-        inp = i
-        i = self.d[0](i)
-        i = Act('lrelu')(i)
-        i = self.d[1](i)
-        i = Act('lrelu')(i)
-        return inp + i
+import traceback
 
 from plotter import interprocess_plotter as plotter
 
@@ -173,7 +158,7 @@ class nnagent(object):
         # return c
 
         c = Can()
-        rect = Act('lrelu')
+        rect = Act('lrelu',0.05)
         d1 = c.add(Dense(inputdims,128))
         d1a = c.add(Dense(128,128))
         d2 = c.add(Dense(128,outputdims))
@@ -189,7 +174,6 @@ class nnagent(object):
     # a = actor(s) : predict actions given state
     def create_actor_network(self,inputdims,outputdims):
         # add gaussian noise.
-        rect = Act('relu')
 
         c = Can()
         c.add(self.create_common_network(inputdims,64))
@@ -216,7 +200,7 @@ class nnagent(object):
         den3 = c.add(Dense(128,64))
         den4 = c.add(Dense(64,1))
 
-        rect = Act('lrelu')
+        rect = Act('lrelu',0.05)
 
         def call(i):
             state = i[0]
@@ -322,16 +306,18 @@ class nnagent(object):
         total_size = batch_size
         epochs = 1
 
+        self.lock.acquire()
         if memory.size() > total_size * 128:
+
             #if enough samples in memory
             for i in range(self.train_multiplier):
                 # sample randomly a minibatch from memory
-                self.lock.acquire()
                 [s1,a1,r1,isdone,s2] = memory.sample_batch(batch_size)
                 # print(s1.shape,a1.shape,r1.shape,isdone.shape,s2.shape)
 
                 self.feed([s1,a1,r1,isdone,s2])
-                self.lock.release()
+
+        self.lock.release()
 
     def feed_one(self,tup):
         self.rpm.add(tup)
@@ -356,6 +342,7 @@ class nnagent(object):
             observation = env.reset()
         except Exception as e:
             print('(agent) something wrong on reset(). episode terminates now')
+            traceback.print_exc()
             print(e)
             return
 
@@ -386,6 +373,7 @@ class nnagent(object):
                 observation, reward, done, _info = env.step(action_out) # take long time
             except Exception as e:
                 print('(agent) something wrong on step(). episode teminates now')
+                traceback.print_exc()
                 print(e)
                 return
 
@@ -447,7 +435,9 @@ class nnagent(object):
 
             noise = curr_noise * 5 - np.arange(self.outputdims) * 12.0 - 30
 
+            self.lock.acquire()
             self.loggraph(np.hstack([disp_actions,noise,q]))
+            self.lock.release()
             # temporarily disabled.
         return actions
 
