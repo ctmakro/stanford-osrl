@@ -248,6 +248,7 @@ class eipool: # Environment Instance Pool
 
 # farm
 # interface with eipool via eids.
+# ! this class is a singleton. must be made thread-safe.
 class farm:
     def pretty(self,s):
         print(('(farm) ')+str(s))
@@ -255,22 +256,23 @@ class farm:
     def __init__(self):
         # on init, create a pool
         # self.renew()
-        pass
+        import threading as th
+        self.lock = th.Lock()
 
     def acq(self,n=None):
         self.renew_if_needed(n)
-        result = self.eip.acq_env()
+        result = self.eip.acq_env() # thread-safe
         if result == False:
-            return False
+            ret = False
         else:
             self.pretty('acq '+str(result.id))
-            return result.id
+            ret = result.id
+        return ret
 
     def rel(self,id):
         e = self.eip.get_env_by_id(id)
         if e == False:
             self.pretty(str(id)+' not found on rel(), might already be released')
-            return False
         else:
             self.eip.rel_env(e)
             self.pretty('rel '+str(id))
@@ -292,28 +294,32 @@ class farm:
         return e.reset()
 
     def renew_if_needed(self,n=None):
+        self.lock.acquire()
         if not hasattr(self,'eip'):
             self.pretty('renew because no eipool present')
-            self.renew(n)
+            self._new(n)
+        self.lock.release()
 
-    # recreate the pool
-    def renew(self,n=None):
-        global ncpu
-        self.pretty('natural pool renew')
-
-        if hasattr(self,'eip'): # if eip exists
-            while not self.eip.all_free(): # wait until all free
-                self.pretty('wait until all of self.eip free..')
-                time.sleep(1)
-            del self.eip
-        self._new(n)
+    # # recreate the pool
+    # def renew(self,n=None):
+    #     global ncpu
+    #     self.pretty('natural pool renew')
+    #
+    #     if hasattr(self,'eip'): # if eip exists
+    #         while not self.eip.all_free(): # wait until all free
+    #             self.pretty('wait until all of self.eip free..')
+    #             time.sleep(1)
+    #         del self.eip
+    #     self._new(n)
 
     def forcerenew(self,n=None):
+        self.lock.acquire()
         self.pretty('forced pool renew')
 
         if hasattr(self,'eip'): # if eip exists
             del self.eip
         self._new(n)
+        self.lock.release()
 
     def _new(self,n=None):
         self.eip = eipool(ncpu if n is None else n)
