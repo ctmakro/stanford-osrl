@@ -5,6 +5,7 @@ import Pyro4 as p4
 p4.config.HOST = '0.0.0.0'
 p4.config.COMMTIMEOUT = 300.0 # 300 seconds timeout
 # p4.config.MAX_RETRIES = 2
+p4.config.THREADPOOL_SIZE = 120
 
 def pyro_connect(address,name):
     uri = 'PYRO:'+name+'@'+address
