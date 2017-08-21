@@ -5,3 +5,4 @@ __pycache__
 *.pickle
 apikey.txt
 /pretrained
+farmlist.py
