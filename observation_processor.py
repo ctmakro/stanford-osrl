@@ -195,7 +195,7 @@ def generate_observation(new, old=None, step=None):
     for i in range(3):
         if i<len(balls):
             ball_vectors.append([
-                max(-3, balls[i][0] - current_pelvis)/3, # ball pos relative to current pos
+                min(4,max(-3, balls[i][0] - current_pelvis))/3, # ball pos relative to current pos
                 balls[i][1], # radius
                 balls[i][2],
             ])
