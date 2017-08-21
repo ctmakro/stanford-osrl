@@ -593,8 +593,9 @@ if __name__=='__main__':
                 # save the training result.
                 save()
 
-            if (i+1) % 1000 == 0:
-                farmer.renew()
+            # following is commented out. dont renew() every so often, impacts performance.
+            # if (i+1) % 1000 == 0:
+            #     farmer.renew()
 
     def test():
         # e = p.env
