@@ -35,19 +35,25 @@ def standalone_headless_isolated(conn,plock):
         print('(standalone) got error!!!')
         conn.send(('error',e))
 
+    def floatify(np):
+        return [float(np[i]) for i in range(len(np))]
+
     try:
         while True:
             msg = conn.recv()
             # messages should be tuples,
             # msg[0] should be string
-            if not isinstance(msg,tuple):
-                raise Exception('pipe message received by headless is not a tuple')
+
+            # isinstance is dangerous, commented out
+            # if not isinstance(msg,tuple):
+            #     raise Exception('pipe message received by headless is not a tuple')
 
             if msg[0] == 'reset':
                 o = e.reset(difficulty=2)
-                conn.send(o)
+                conn.send(floatify(o))
             elif msg[0] == 'step':
                 ordi = e.step(msg[1])
+                ordi[0] = floatify(ordi[0])
                 conn.send(ordi)
             else:
                 conn.close()
@@ -147,14 +153,16 @@ class ei: # Environment Instance
     def recv(self):
         # receive and detect if we got any errors
         r = self.pc.recv()
-        if isinstance(r,tuple):
-            if r[0] == 'error':
-                # read the exception string
-                e == r[1]
-                self.pretty('got exception')
-                self.pretty(e)
 
-                raise Exception(e)
+        # isinstance is dangerous, commented out
+        # if isinstance(r,tuple):
+        if r[0] == 'error':
+            # read the exception string
+            e == r[1]
+            self.pretty('got exception')
+            self.pretty(e)
+
+            raise Exception(e)
         return r
 
     def reset(self):
@@ -188,7 +196,7 @@ class ei: # Environment Instance
         if not self.is_alive():
             self.pretty('process already dead, no need for kill.')
         else:
-            self.pc.send(('exit',))
+            self.send(('exit',))
             self.pretty('waiting for join()...')
 
             while 1:
