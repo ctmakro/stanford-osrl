@@ -3,6 +3,8 @@
 # connector to the farms
 from pyro_helper import pyro_connect
 
+import threading as th
+
 farmport = 20099
 
 from farmlist import farmlist
@@ -63,6 +65,8 @@ class farmer:
 
     # find non-occupied instances from all available farms
     def acq_env(self):
+        ret = False
+
         import random # randomly sample to achieve load averaging
         # l = list(enumerate(addresses))
         l = list(range(len(addresses)))
@@ -88,19 +92,20 @@ class farmer:
                     fp._pyroRelease()
                     failures[idx] += 4
                     continue
+                else:
+                    if result == False: # no free ei
+                        fp._pyroRelease() # destroy proxy
+                        failures[idx] += 4
+                        continue
+                    else: # result is an id
+                        id = result
+                        renv = remoteEnv(fp,id) # build remoteEnv around the proxy
+                        self.pretty('got one on '+address+' '+str(id))
+                        ret = renv
+                        break
 
-                if result == False: # no free ei
-                    fp._pyroRelease() # destroy proxy
-                    failures[idx] += 4
-                    continue
-                else: # result is an id
-                    id = result
-                    renv = remoteEnv(fp,id) # build remoteEnv around the proxy
-                    self.pretty('got one on '+address+' '+str(id))
-                    return renv
-
-        # if none of the farms has free ei:
-        return False
+        # ret is False if none of the farms has free ei
+        return ret
 
     # the following is commented out. should not use.
     # def renew(self):
