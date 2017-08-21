@@ -28,18 +28,7 @@ def softmax(x):
     ex = np.exp(x)
     return ex / np.sum(ex, axis=0)
 
-class TriggerBox():
-    def __init__(self,msg,texts,callbacks):
-        def show():
-            import pymsgbox
-            while True:
-                chosen = pymsgbox.confirm(text=msg,title='triggers',buttons=texts)
-                for i,t in enumerate(texts):
-                    if t==chosen:
-                        print(i,t,'chosen...')
-                        callbacks[i]()
-        import threading as th
-        th.Thread(target=show, daemon=True).start()
+from triggerbox import TriggerBox
 
 class ResDense(Can): # residual dense unit
     def __init__(self,nip):
@@ -66,15 +55,17 @@ class nnagent(object):
     action_space,
     stack_factor=1,
     discount_factor=.99, # gamma
-    train_skip_every=1,
+    # train_skip_every=1,
+    train_multiplier=1,
     ):
         self.rpm = rpm(1000000) # 1M history
-        self.plotter = plotter(num_lines=2)
+        self.plotter = plotter(num_lines=3)
         self.render = True
         self.training = True
         self.noise_source = one_fsq_noise()
         self.train_counter = 0
-        self.train_skip_every = train_skip_every
+        # self.train_skip_every = train_skip_every
+        self.train_multiplier = train_multiplier
         self.observation_stack_factor = stack_factor
 
         self.inputdims = observation_space_dims * self.observation_stack_factor
@@ -145,16 +136,63 @@ class nnagent(object):
             colors.append([0.2,0.5,0.9])
             self.wavegraph = wavegraph(num_waves,'actions/noises/Q',np.array(colors))
 
+    # the part of network that the input and output shares architechture
+    def create_common_network(self,inputdims,outputdims):
+        # timesteps = 8
+        # dim_per_ts = int(inputdims/timesteps)
+        # rect = Act('relu')
+        # c = Can()
+        #
+        # if not hasattr(self,'gru'):
+        #     # share parameters between actor and critic
+        #     self.common_gru = GRU(dim_per_ts,128)
+        #
+        # gru = c.add(self.common_gru)
+        #
+        # # d1 = c.add(Dense(128,128))
+        # d2 = c.add(Dense(128,outputdims))
+        #
+        # def call(i):
+        #     # shape i: [Batch Dim*Timesteps]
+        #
+        #     batchsize = tf.shape(i)[0]
+        #
+        #     reshaped = tf.reshape(i,[batchsize,timesteps,dim_per_ts])
+        #     # [Batch Timesteps Dim]
+        #
+        #     o = gru(reshaped)
+        #     # [Batch Timesteps Dim]
+        #
+        #     ending = o[:,timesteps-1,:]
+        #
+        #     # l1 = rect(d1(ending))
+        #     l2 = rect(d2(ending))
+        #     return l2
+        #
+        # c.set_function(call)
+        # return c
+
+        c = Can()
+        rect = Act('lrelu')
+        d1 = c.add(Dense(inputdims,128))
+        d1a = c.add(Dense(128,128))
+        d2 = c.add(Dense(128,outputdims))
+
+        def call(i):
+            l1 = rect(d1(i))
+            l1a = rect(d1a(l1))
+            l2 = rect(d2(l1a))
+            return l2
+        c.set_function(call)
+        return c
+
     # a = actor(s) : predict actions given state
     def create_actor_network(self,inputdims,outputdims):
         # add gaussian noise.
-        rect = Act('lrelu')
+        rect = Act('relu')
 
         c = Can()
-        c.add(Dense(inputdims, 128))
-        c.add(rect)
-        c.add(Dense(128,64))
-        c.add(rect)
+        c.add(self.create_common_network(inputdims,64))
         c.add(Dense(64,outputdims))
 
         if self.is_continuous:
@@ -169,10 +207,11 @@ class nnagent(object):
     # q = critic(s,a) : predict q given state and action
     def create_critic_network(self,inputdims,actiondims):
         c = Can()
-        concat = Lambda(lambda x:tf.concat([x[0],x[1]],axis=1))
+        concat = Lambda(lambda x:tf.concat(x,axis=1))
+
         # concat state and action
-        den0 = c.add(Dense(inputdims,128))
-        den1 = c.add(Dense(128, 64))
+        den0 = c.add(self.create_common_network(inputdims,64))
+        # den1 = c.add(Dense(256, 256))
         den2 = c.add(Dense(64+actiondims, 128))
         den3 = c.add(Dense(128,64))
         den4 = c.add(Dense(64,1))
@@ -183,9 +222,6 @@ class nnagent(object):
             state = i[0]
             action = i[1]
             i = den0(state)
-            i = rect(i)
-            i = den1(i)
-            i = rect(i)
 
             i = concat([i,action])
             i = den2(i)
@@ -283,23 +319,19 @@ class nnagent(object):
     def train(self,verbose=1):
         memory = self.rpm
         batch_size = 64
-        total_size = batch_size * self.train_skip_every
+        total_size = batch_size
         epochs = 1
 
-        self.train_counter+=1
-        self.train_counter %= self.train_skip_every
-
-        if self.train_counter != 0: # train every few steps
-            return
-
-        if memory.size() > total_size * 64:
+        if memory.size() > total_size * 128:
             #if enough samples in memory
-            for i in range(self.train_skip_every):
+            for i in range(self.train_multiplier):
                 # sample randomly a minibatch from memory
+                self.lock.acquire()
                 [s1,a1,r1,isdone,s2] = memory.sample_batch(batch_size)
                 # print(s1.shape,a1.shape,r1.shape,isdone.shape,s2.shape)
 
                 self.feed([s1,a1,r1,isdone,s2])
+                self.lock.release()
 
     def feed_one(self,tup):
         self.rpm.add(tup)
@@ -315,16 +347,17 @@ class nnagent(object):
         max_steps = max_steps if max_steps > 0 else 50000
         steps = 0
         total_reward = 0
+        episode_memory = []
 
         # removed: state stacking
+        # moved: observation processing
 
-        old_observation = None
-        def obg(plain_obs):
-            nonlocal old_observation, steps
-            processed_observation, old_observation = go(plain_obs, old_observation, step=steps)
-            return np.array(processed_observation)
-
-        observation = obg(env.reset())
+        try:
+            observation = env.reset()
+        except Exception as e:
+            print('(agent) something wrong on reset(). episode terminates now')
+            print(e)
+            return
 
         while True and steps <= max_steps:
             steps +=1
@@ -334,9 +367,9 @@ class nnagent(object):
             exploration_noise = noise_source.one((self.outputdims,),noise_level)
             # exploration_noise -= noise_level * 1
 
-            self.lock.acquire() # please do not disrupt.
+            # self.lock.acquire() # please do not disrupt.
             action = self.act(observation_before_action, exploration_noise) # a1
-            self.lock.release()
+            # self.lock.release()
 
             if self.is_continuous:
                 # add noise to our actions, since our policy by nature is deterministic
@@ -346,28 +379,36 @@ class nnagent(object):
                 action = self.clamper(action)
                 action_out = action
             else:
-                raise NamedException('this version of ddpg is for continuous only.')
+                raise RuntimeError('this version of ddpg is for continuous only.')
 
             # o2, r1,
-            observation, reward, done, _info = env.step(action_out) # take long time
-
-            observation = obg(observation)
+            try:
+                observation, reward, done, _info = env.step(action_out) # take long time
+            except Exception as e:
+                print('(agent) something wrong on step(). episode teminates now')
+                print(e)
+                return
 
             # d1
             isdone = 1 if done else 0
             total_reward += reward
 
-            self.lock.acquire()
             # feed into replay memory
             if self.training == True:
-                self.feed_one((
+                episode_memory.append((
                     observation_before_action,action,reward,isdone,observation
-                )) # s1,a1,r1,isdone,s2
+                ))
+
+                # don't feed here since you never know whether the episode will complete without error.
+                # self.feed_one((
+                #     observation_before_action,action,reward,isdone,observation
+                # )) # s1,a1,r1,isdone,s2
+                # self.lock.acquire()
                 self.train(verbose=2 if steps==1 else 0)
+                # self.lock.release()
 
             # if self.render==True and (steps%30==0 or realtime==True):
             #     env.render()
-            self.lock.release()
             if done :
                 break
 
@@ -377,7 +418,11 @@ class nnagent(object):
         steps,totaltime,totaltime/steps,total_reward
         ))
         self.lock.acquire()
-        self.plotter.pushys([total_reward,noise_level])
+
+        for t in episode_memory:
+            self.feed_one(t)
+
+        self.plotter.pushys([total_reward,noise_level,(time.time()%3600)/3600-2])
         # self.noiseplotter.pushy(noise_level)
         self.lock.release()
 
@@ -390,7 +435,10 @@ class nnagent(object):
 
         # actions = actor.infer(obs)
         # q = critic.infer([obs,actions])[0]
+        self.lock.acquire()
         [actions,q] = self.joint_inference(obs)
+        self.lock.release()
+
         actions,q = actions[0],q[0]
 
         if curr_noise is not None:
@@ -419,22 +467,6 @@ class nnagent(object):
             network = getattr(self,name)
             network.load_weights('ddpg_'+name+'.npz')
 
-class playground(object):
-    def __init__(self,envname):
-        self.envname=envname
-        env = gym.make(envname)
-        self.env = env
-
-        self.monpath = './experiment-'+self.envname
-
-    def wrap(self):
-        from gym import wrappers
-        self.env = wrappers.Monitor(self.env,self.monpath,force=True)
-
-    def up(self):
-        self.env.close()
-        gym.upload(self.monpath, api_key='sk_ge0PoVXsS6C5ojZ9amTkSA')
-
 from osim.env import RunEnv
 
 if __name__=='__main__':
@@ -445,60 +477,47 @@ if __name__=='__main__':
     # e = p.env
 
     e = RunEnv(visualize=False)
+    from observation_processor import processed_dims
 
     agent = nnagent(
-    55+7,
+    processed_dims,
     e.action_space,
-    discount_factor=.99,
+    discount_factor=.985,
+    # .99 = 100 steps = 4 second lookahead
+    # .985 = somewhere in between.
+    # .98 = 50 steps = 2 second lookahead
+    # .96 = 25 steps = 1 second lookahead
     stack_factor=1,
-    train_skip_every=1,
+    train_multiplier=4,
     )
 
     noise_level = 2.
-    noise_decay_rate = 0.005
-    noise_floor = 0.1
-    noise_level = 3.
-    noise_floor = 0.01
+    noise_decay_rate = 0.002
+    noise_floor = 0.2
+    noiseless = 0.005
 
-    show_sim = False
+    # show_sim = False
+    #
+    # from multi import eipool # multiprocessing driven simulation pool
+    # epl = None
+    # def newpool(count=6):
+    #     global epl,show_sim
+    #     tepl = epl
+    #     epl = eipool(count,showfirst=show_sim)
+    #     del tepl
+    #
+    # newpool()
 
-    from multi import eipool # multiprocessing driven simulation pool
-    epl = None
-    def newpool():
-        global epl,show_sim
-        tepl = epl
-        epl = eipool(6,showfirst=show_sim)
-        del tepl
+    from farmer import farmer as farmer_class
+    # from multi import fastenv
 
-    newpool()
+    # one and only
+    farmer = farmer_class()
 
-    def playonce():
-        global noise_level
-        env = epl.acq_env()
-        agent.play(env,realtime=False,max_steps=-1,noise_level=noise_level)
-        epl.rel_env(env)
-
-    def playtwice(times):
-        import threading as th
-        threads = [th.Thread(target=playonce,daemon=True) for i in range(times)]
-        for i in threads:
-            i.start()
-        for i in threads:
-            i.join()
-
-    def play_ignore():
-        import threading as th
-        t = th.Thread(target=playonce,daemon=True)
-        t.start()
-        # ignore and return.
-
-    def playifavailable():
-        while True:
-            if epl.num_free()<=0:
-                time.sleep(0.5)
-            else:
-                play_ignore()
-                break
+    def refarm():
+        global farmer
+        del farmer
+        farmer = farmer_class()
 
     stopsimflag = False
     def stopsim():
@@ -509,6 +528,33 @@ if __name__=='__main__':
     tb = TriggerBox('Press a button to do something.',
         ['stop simulation'],
         [stopsim])
+
+    def playonce(nl,env):
+        from multi import fastenv
+
+        # global noise_level
+        # env = farmer.acq_env()
+        fenv = fastenv(env,4)
+        agent.play(fenv,realtime=False,max_steps=-1,noise_level=nl)
+        # epl.rel_env(env)
+        env.rel()
+        del fenv
+
+    def play_ignore(nl,env):
+        import threading as th
+        t = th.Thread(target=playonce,args=(nl,env),daemon=True)
+        t.start()
+        # ignore and return.
+
+    def playifavailable(nl):
+        while True:
+            remote_env = farmer.acq_env()
+            if remote_env == False: # no free environment
+                # time.sleep(0.1)
+                pass
+            else:
+                play_ignore(nl,remote_env)
+                break
 
     def r(ep,times=1):
         global noise_level,stopsimflag
@@ -523,27 +569,32 @@ if __name__=='__main__':
             noise_level *= (1-noise_decay_rate)
             noise_level = max(noise_floor, noise_level)
 
-            print('ep',i+1,'/',ep,'times:',times,'noise_level',noise_level)
+            nl = noise_level if np.random.uniform()>0.05 else noiseless
+
+            print('ep',i+1,'/',ep,'times:',times,'noise_level',nl)
             # playtwice(times)
-            playifavailable()
+            playifavailable(nl)
 
             time.sleep(0.01)
 
-            if (i+1) % 100 == 0:
-                global epl
+            if (i+1) % 200 == 0:
+                # global epl
+                #
+                # while True: # wait until all free
+                #     if epl.all_free():
+                #         break
+                #     else:
+                #         print('wait until all of epl free..')
+                #         time.sleep(0.5)
 
-                while True: # wait until all free
-                    if epl.all_free():
-                        break
-                    else:
-                        print('wait until all of epl free..')
-                        time.sleep(0.5)
-
-                # reset the env to prevent memory leak.
-                newpool()
+                # # reset the env to prevent memory leak.
+                # newpool()
 
                 # save the training result.
                 save()
+
+            if (i+1) % 1000 == 0:
+                farmer.renew()
 
     def test():
         # e = p.env
@@ -560,6 +611,10 @@ if __name__=='__main__':
 
     def up():
         # uploading to CrowdAI
+
+        # global _stepsize
+        # _stepsize = 0.01
+
         apikey = open('apikey.txt').read().strip('\n')
         print('apikey is',apikey)
 
@@ -581,8 +636,8 @@ if __name__=='__main__':
         total_reward = 0
         old_observation = None
         def obg(plain_obs):
-            nonlocal old_observation
-            processed_observation, old_observation = go(plain_obs, old_observation, step=0)
+            nonlocal old_observation, stepno
+            processed_observation, old_observation = go(plain_obs, old_observation, step=stepno)
             return np.array(processed_observation)
 
 
@@ -613,3 +668,5 @@ if __name__=='__main__':
 
         print('submitting...')
         client.submit()
+
+        # _stepsize = 0.04

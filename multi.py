@@ -22,16 +22,28 @@ class fastenv:
         return np.array(processed_observation)
 
     def step(self,action):
-        action = [float(i) for i in action]
+        action = [float(action[i]) for i in range(len(action))]
+
+        import math
+        for num in action:
+            if math.isnan(num):
+                print('NaN met',action)
+                raise RuntimeError('this is bullshit')
+
         sr = 0
         for j in range(self.skipcount):
             self.stepcount+=1
-            o,r,d,i = self.e.step(action)
-            o = self.obg(o)
+            oo,r,d,i = self.e.step(action)
+            o = self.obg(oo)
             sr += r
 
             if d == True:
                 break
+
+        # # alternative reward scheme
+        # delta_x = oo[1] - self.lastx
+        # sr = delta_x * 10
+        # self.lastx = oo[1]
 
         return o,sr,d,i
 
@@ -39,9 +51,10 @@ class fastenv:
         self.stepcount=0
         self.old_observation = None
 
-        o = self.e.reset()
+        oo = self.e.reset()
         # o = self.e.reset(difficulty=2)
-        o = self.obg(o)
+        self.lastx = oo[1]
+        o = self.obg(oo)
         return o
 
 
