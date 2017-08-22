@@ -101,7 +101,7 @@ def process_observation(observation):
     o[20] -= pvx
     o[21] -= pvy
 
-    o[38]=0 # ball info are included later in the stage
+    o[38]= min(4,o[38]) # ball info are included later in the stage
     # o[39]/=5
     # o[40]/=5
 
@@ -209,7 +209,7 @@ def generate_observation(new, old=None, step=None):
     # 9-d
     final_observation += flatten(ball_vectors)
 
-    episode_end_indicator = max(0, (step/1000)) # lights up when near end-of-episode
+    episode_end_indicator = max(0, (step/2000)) # lights up when near end-of-episode
 
     final_observation += [episode_end_indicator]
 
