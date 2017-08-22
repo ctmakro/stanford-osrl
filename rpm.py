@@ -12,7 +12,11 @@ class rpm(object):
         self.buffer = []
         self.index = 0
 
+        import threading
+        self.lock = threading.Lock()
+
     def add(self, obj):
+        self.lock.acquire()
         if self.size() > self.buffer_size:
             # self.buffer.popleft()
             # self.buffer = self.buffer[1:]
@@ -29,6 +33,8 @@ class rpm(object):
 
         else:
             self.buffer.append(obj)
+
+        self.lock.release()
 
     def size(self):
         return len(self.buffer)
@@ -58,8 +64,10 @@ class rpm(object):
         return res
 
     def save(self, pathname):
+        self.lock.acquire()
         pickle.dump([self.buffer,self.index], open(pathname, 'wb'))
         print('memory dumped into',pathname)
+        self.lock.release()
     def load(self, pathname):
         [self.buffer,self.index] = pickle.load(open(pathname, 'rb'))
         print('memory loaded from',pathname)
