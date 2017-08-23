@@ -173,7 +173,7 @@ class ei: # Environment Instance
             self.kill()
             self.newproc()
 
-        if self.reset_count>100: # if resetted for more than 100 times
+        if self.reset_count>50: # if resetted for more than 100 times
             self.pretty('environment has been resetted too much. memory leaks and other problems might present. reloading.')
 
             self.kill()
