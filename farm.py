@@ -141,6 +141,7 @@ class ei: # Environment Instance
         self.p.start()
 
         self.reset_count = 0 # how many times has this instance been reset() ed
+        self.step_count = 0
 
         self.timer_update()
         return
@@ -173,7 +174,7 @@ class ei: # Environment Instance
             self.kill()
             self.newproc()
 
-        if self.reset_count>50: # if resetted for more than 100 times
+        if self.reset_count>50 or self.step_count>10000: # if resetted for more than 100 times
             self.pretty('environment has been resetted too much. memory leaks and other problems might present. reloading.')
 
             self.kill()
@@ -190,6 +191,7 @@ class ei: # Environment Instance
         self.send(('step',actions,))
         r = self.recv()
         self.timer_update()
+        self.step_count+=1
         return r
 
     def kill(self):
