@@ -100,8 +100,8 @@ class ei: # Environment Instance
         if self.occupied == False:
             return False
         else:
-            if time.time() - self.last_interaction > 361:
-                # if no interaction for more than 6 minutes
+            if time.time() - self.last_interaction > 15*60:
+                # if no interaction for more than 15 minutes
                 self.pretty('no interaction for too long, self-releasing now. applying for a new id.')
 
                 self.id = get_eid() # apply for a new id.
