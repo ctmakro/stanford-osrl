@@ -5,7 +5,7 @@
 # and expose those instances as one giant callable class
 
 import multiprocessing,time,random,threading
-from multiprocessing import Process, Pipe
+from multiprocessing import Process, Pipe, Queue
 # from osim.env import RunEnv
 
 ncpu = multiprocessing.cpu_count()
@@ -33,14 +33,16 @@ def standalone_headless_isolated(conn,plock):
         # a way to report errors ( since you can't just throw them over a pipe )
         # e should be a string
         print('(standalone) got error!!!')
-        conn.send(('error',e))
+        # conn.send(('error',e))
+        conn.put(('error',e))
 
     def floatify(np):
         return [float(np[i]) for i in range(len(np))]
 
     try:
         while True:
-            msg = conn.recv()
+            # msg = conn.recv()
+            msg = conn.get()
             # messages should be tuples,
             # msg[0] should be string
 
@@ -50,11 +52,13 @@ def standalone_headless_isolated(conn,plock):
 
             if msg[0] == 'reset':
                 o = e.reset(difficulty=2)
-                conn.send(floatify(o))
+                # conn.send(floatify(o))
+                conn.put(floatify(o))
             elif msg[0] == 'step':
                 ordi = e.step(msg[1])
                 ordi[0] = floatify(ordi[0])
-                conn.send(ordi)
+                conn.put(ordi)
+                # conn.send(ordi)
             else:
                 conn.close()
                 del e
@@ -131,11 +135,12 @@ class ei: # Environment Instance
         global plock
         self.timer_update()
 
-        self.pc, self.cc = Pipe()
+        self.q = Queue()
+        # self.pc, self.cc = Pipe()
 
         self.p = Process(
             target = standalone_headless_isolated,
-            args=(self.cc, plock)
+            args=(self.q, plock)
         )
         self.p.daemon = True
         self.p.start()
@@ -148,12 +153,14 @@ class ei: # Environment Instance
 
     # send x to the process
     def send(self,x):
-        return self.pc.send(x)
+        return self.q.put(x)
+        # return self.pc.send(x)
 
     # receive from the process.
     def recv(self):
         # receive and detect if we got any errors
-        r = self.pc.recv()
+        # r = self.pc.recv()
+        r = self.q.get()
 
         # isinstance is dangerous, commented out
         # if isinstance(r,tuple):
