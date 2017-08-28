@@ -135,7 +135,7 @@ class ei: # Environment Instance
         global plock
         self.timer_update()
 
-        self.q = Queue()
+        self.q = Queue(1)
         # self.pc, self.cc = Pipe()
 
         self.p = Process(
