@@ -12,10 +12,10 @@ ncpu = multiprocessing.cpu_count()
 
 # separate process that holds a separate RunEnv instance.
 # This has to be done since RunEnv() in the same process result in interleaved running of simulations.
-def standalone_headless_isolated(conn,plock):
+def standalone_headless_isolated(pq, cq, plock):
     # locking to prevent mixed-up printing.
     plock.acquire()
-    print('starting headless...',conn)
+    print('starting headless...',pq,cq)
     try:
         import traceback
         from osim.env import RunEnv
@@ -34,7 +34,8 @@ def standalone_headless_isolated(conn,plock):
         # e should be a string
         print('(standalone) got error!!!')
         # conn.send(('error',e))
-        conn.put(('error',e))
+        # conn.put(('error',e))
+        cq.put(('error',e))
 
     def floatify(np):
         return [float(np[i]) for i in range(len(np))]
@@ -42,7 +43,8 @@ def standalone_headless_isolated(conn,plock):
     try:
         while True:
             # msg = conn.recv()
-            msg = conn.get()
+            # msg = conn.get()
+            msg = pq.get()
             # messages should be tuples,
             # msg[0] should be string
 
@@ -53,14 +55,18 @@ def standalone_headless_isolated(conn,plock):
             if msg[0] == 'reset':
                 o = e.reset(difficulty=2)
                 # conn.send(floatify(o))
-                conn.put(floatify(o))
+                cq.put(floatify(o))
+                # conn.put(floatify(o))
             elif msg[0] == 'step':
                 ordi = e.step(msg[1])
                 ordi[0] = floatify(ordi[0])
-                conn.put(ordi)
+                cq.put(ordi)
+                # conn.put(ordi)
                 # conn.send(ordi)
             else:
-                conn.close()
+                # conn.close()
+                cq.close()
+                pq.close()
                 del e
                 break
     except Exception as e:
@@ -135,12 +141,12 @@ class ei: # Environment Instance
         global plock
         self.timer_update()
 
-        self.q = Queue(1)
+        self.pq, self.cq = Queue(1), Queue(1) # two queue needed
         # self.pc, self.cc = Pipe()
 
         self.p = Process(
             target = standalone_headless_isolated,
-            args=(self.q, plock)
+            args=(self.pq, self.cq, plock)
         )
         self.p.daemon = True
         self.p.start()
@@ -153,14 +159,14 @@ class ei: # Environment Instance
 
     # send x to the process
     def send(self,x):
-        return self.q.put(x)
+        return self.pq.put(x)
         # return self.pc.send(x)
 
     # receive from the process.
     def recv(self):
         # receive and detect if we got any errors
         # r = self.pc.recv()
-        r = self.q.get()
+        r = self.cq.get()
 
         # isinstance is dangerous, commented out
         # if isinstance(r,tuple):
