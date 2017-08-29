@@ -6,19 +6,38 @@ from pyro_helper import pyro_connect
 import threading as th
 import time
 
-farmport = 20099
+# farmport = 20099
 
-from farmlist import farmlist
+class farmlist:
+    def __init__(self):
+        self.list = []
 
-def addressify(farmaddr,port):
-    return farmaddr+':'+str(port)
+    def generate(self):
+        farmport = 20099
+        def addressify(farmaddr,port):
+            return farmaddr+':'+str(port)
+        addresses = [addressify(farm[0],farmport) for farm in self.list]
+        capacities = [farm[1] for farm in self.list]
+        failures = [0 for i in range(len(capacities))]
 
-addresses = [addressify(farm[0],farmport) for farm in farmlist]
-capacities = [farm[1] for farm in farmlist]
+        return addresses,capacities,failures
 
-failures = [0 for i in range(len(capacities))]
+    def push(self, addr, capa):
+        self.list.append((addr,capa))
 
-total_capacity = sum(capacities)
+fl = farmlist()
+from farmlist import farmlist_base
+for item in farmlist_base:
+    fl.push(item[0],item[1])
+
+# call fl.push(addr, capa) to add server to list
+# call refresh_addresses() to apply the new list
+
+def refresh_addresses():
+    global addresses,capacities,failures
+    addresses,capacities,failures = fl.generate()
+
+refresh_addresses()
 
 class remoteEnv:
     def pretty(self,s):
