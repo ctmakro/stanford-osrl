@@ -188,12 +188,18 @@ def generate_observation(new, old=None, step=None):
         if current_ball_radius == 0: # no balls ahead
             return
 
-        compare_result = [abs(b[0] - absolute_ball_pos) < 0.0001 for b in balls]
+        compare_result = [abs(b[0] - absolute_ball_pos) < 1e-9 for b in balls]
         # [False, False, False, False] if is different ball
 
         got_new = sum([(1 if r==True else 0)for r in compare_result]) == 0
 
         if got_new:
+            # for every ball there is
+            for b in balls:
+                # if this new ball is smaller in x than any ball there is
+                if absolute_ball_pos < (b[0] - 1e-9):
+                    raise Exception('new ball closer than the old ones.')
+
             balls.append([
                 absolute_ball_pos,
                 current_ball_height,
@@ -202,10 +208,11 @@ def generate_observation(new, old=None, step=None):
             if len(balls)>3:
                 print(balls)
                 print('(@ step '+str(step)+')What the fuck you just did! Why num of balls became greater than 3!!!')
+                raise Exception('ball number greater than 3.')
         else:
             pass # we already met this ball before.
 
-    if step > 10:
+    if step > 5:
         # ignore ghost obstacles, fuck the fucking organizer
         addball_if_new()
 
