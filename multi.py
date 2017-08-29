@@ -42,7 +42,7 @@ class fastenv:
 
         # # alternative reward scheme
         # delta_x = oo[1] - self.lastx
-        # sr = delta_x * 10
+        # sr = delta_x * 1
         # self.lastx = oo[1]
 
         return o,sr,d,i

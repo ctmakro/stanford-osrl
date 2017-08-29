@@ -4,6 +4,7 @@
 from pyro_helper import pyro_connect
 
 import threading as th
+import time
 
 farmport = 20099
 
@@ -31,7 +32,11 @@ class remoteEnv:
         return self.fp.reset(self.id)
 
     def step(self,actions):
-        return self.fp.step(self.id, actions)
+        ret = self.fp.step(self.id, actions)
+        if ret == False:
+            self.pretty('env not found on farm side, might been released.')
+            raise Exception('env not found on farm side, might been released.')
+        return ret
 
     def rel(self):
         while True: # releasing is important, so
@@ -41,9 +46,13 @@ class remoteEnv:
             except Exception as e:
                 self.pretty('exception caught on rel()')
                 self.pretty(e)
+                time.sleep(3)
                 pass
 
         self.fp._pyroRelease()
+
+    def __del__(self):
+        self.rel()
 
 class farmer:
     def pretty(self,s):
@@ -73,6 +82,7 @@ class farmer:
         random.shuffle(l)
 
         for idx in l:
+            time.sleep(0.1)
             address = addresses[idx]
             capacity = capacities[idx]
 

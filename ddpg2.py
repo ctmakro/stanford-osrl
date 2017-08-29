@@ -158,15 +158,18 @@ class nnagent(object):
         # return c
 
         c = Can()
-        rect = Act('lrelu',0.05)
-        d1 = c.add(Dense(inputdims,128))
-        d1a = c.add(Dense(128,128))
-        d2 = c.add(Dense(128,outputdims))
+        rect = Act('lrelu',alpha=0.2)
+        # rect = Act('elu')
+        d1 = c.add(Dense(inputdims,256))
+        # d1a = c.add(Dense(256,128))
+        d2 = c.add(Dense(256,outputdims))
 
         def call(i):
+            i = Lambda(lambda x:x/3)(i) # downscale
             l1 = rect(d1(i))
-            l1a = rect(d1a(l1))
-            l2 = rect(d2(l1a))
+            # l1a = rect(d1a(l1))
+            l2 = rect(d2(l1))
+            # l2 = Lambda(lambda x:x/8)(l2) # downscale a bit
             return l2
         c.set_function(call)
         return c
@@ -175,9 +178,14 @@ class nnagent(object):
     def create_actor_network(self,inputdims,outputdims):
         # add gaussian noise.
 
+        rect = Act('relu',alpha=0.2)
+        # rect = Act('elu')
+
         c = Can()
-        c.add(self.create_common_network(inputdims,64))
-        c.add(Dense(64,outputdims))
+        c.add(self.create_common_network(inputdims,128))
+        c.add(Dense(128,128))
+        c.add(rect)
+        c.add(Dense(128,outputdims))
 
         if self.is_continuous:
             c.add(Act('tanh'))
@@ -194,13 +202,14 @@ class nnagent(object):
         concat = Lambda(lambda x:tf.concat(x,axis=1))
 
         # concat state and action
-        den0 = c.add(self.create_common_network(inputdims,64))
+        den0 = c.add(self.create_common_network(inputdims,128))
         # den1 = c.add(Dense(256, 256))
-        den2 = c.add(Dense(64+actiondims, 128))
+        den2 = c.add(Dense(128+actiondims, 128))
         den3 = c.add(Dense(128,64))
         den4 = c.add(Dense(64,1))
 
-        rect = Act('lrelu',0.05)
+        rect = Act('lrelu',alpha = 0.2)
+        # rect = Act('elu')
 
         def call(i):
             state = i[0]
@@ -259,17 +268,20 @@ class nnagent(object):
         q_infer = self.critic([s1,a_infer])
 
         # 5. L2 weight decay on critic
-        decay_c = tf.reduce_sum([tf.reduce_sum(w**2) for w in cw])* 0.0001
-        # decay_a = tf.reduce_sum([tf.reduce_sum(w**2) for w in aw])* 0.0001
+        decay_c = tf.reduce_sum([tf.reduce_sum(w**2) for w in cw])* 1e-7
+        decay_a = tf.reduce_sum([tf.reduce_sum(w**2) for w in aw])* 1e-7
+
+        decay_c = 0
+        decay_a = 0
 
         # optimizer on
         # actor is harder to stabilize...
         opt_actor = tf.train.AdamOptimizer(1e-4)
-        opt_critic = tf.train.AdamOptimizer(2e-4)
+        opt_critic = tf.train.AdamOptimizer(3e-4)
         # opt_actor = tf.train.RMSPropOptimizer(1e-3)
         # opt_critic = tf.train.RMSPropOptimizer(1e-3)
-        cstep = opt_critic.minimize(critic_loss, var_list=cw)
-        astep = opt_actor.minimize(actor_loss, var_list=aw)
+        cstep = opt_critic.minimize(critic_loss+decay_c, var_list=cw)
+        astep = opt_actor.minimize(actor_loss+decay_a, var_list=aw)
 
         self.feedcounter=0
         def feed(memory):
@@ -278,7 +290,7 @@ class nnagent(object):
             res = sess.run([critic_loss,actor_loss,
                 cstep,astep,shift1,shift2],
                 feed_dict={
-                s1:s1d,a1:a1d,r1:r1d,isdone:isdoned,s2:s2d,tau:1e-3
+                s1:s1d,a1:a1d,r1:r1d,isdone:isdoned,s2:s2d,tau:5e-4
                 })
 
             #debug purposes
@@ -327,7 +339,7 @@ class nnagent(object):
         timer = time.time()
         noise_source = one_fsq_noise()
 
-        for j in range(10):
+        for j in range(200):
             noise_source.one((self.outputdims,),noise_level)
 
         max_steps = max_steps if max_steps > 0 else 50000
@@ -472,31 +484,19 @@ if __name__=='__main__':
     agent = nnagent(
     processed_dims,
     e.action_space,
-    discount_factor=.985,
+    discount_factor=.98,
     # .99 = 100 steps = 4 second lookahead
     # .985 = somewhere in between.
     # .98 = 50 steps = 2 second lookahead
     # .96 = 25 steps = 1 second lookahead
     stack_factor=1,
-    train_multiplier=4,
+    train_multiplier=2,
     )
 
     noise_level = 2.
-    noise_decay_rate = 0.002
-    noise_floor = 0.2
-    noiseless = 0.005
-
-    # show_sim = False
-    #
-    # from multi import eipool # multiprocessing driven simulation pool
-    # epl = None
-    # def newpool(count=6):
-    #     global epl,show_sim
-    #     tepl = epl
-    #     epl = eipool(count,showfirst=show_sim)
-    #     del tepl
-    #
-    # newpool()
+    noise_decay_rate = 0.001
+    noise_floor = 0.25
+    noiseless = 0.01
 
     from farmer import farmer as farmer_class
     # from multi import fastenv
@@ -548,8 +548,7 @@ if __name__=='__main__':
 
     def r(ep,times=1):
         global noise_level,stopsimflag
-        # agent.render = True
-        # e = p.env
+
         for i in range(ep):
             if stopsimflag:
                 stopsimflag = False
@@ -557,35 +556,21 @@ if __name__=='__main__':
                 break
 
             noise_level *= (1-noise_decay_rate)
+            # noise_level -= noise_decay_rate
             noise_level = max(noise_floor, noise_level)
 
             nl = noise_level if np.random.uniform()>0.05 else noiseless
+            # nl = noise_level * np.random.uniform() + 0.01
 
             print('ep',i+1,'/',ep,'times:',times,'noise_level',nl)
             # playtwice(times)
             playifavailable(nl)
 
-            time.sleep(0.01)
+            time.sleep(0.1)
 
-            if (i+1) % 200 == 0:
-                # global epl
-                #
-                # while True: # wait until all free
-                #     if epl.all_free():
-                #         break
-                #     else:
-                #         print('wait until all of epl free..')
-                #         time.sleep(0.5)
-
-                # # reset the env to prevent memory leak.
-                # newpool()
-
+            if (i+1) % 1000 == 0:
                 # save the training result.
                 save()
-
-            # following is commented out. dont renew() every so often, impacts performance.
-            # if (i+1) % 1000 == 0:
-            #     farmer.renew()
 
     def test():
         # e = p.env
