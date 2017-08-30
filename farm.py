@@ -58,9 +58,9 @@ def standalone_headless_isolated(pq, cq, plock):
                 cq.put(floatify(o))
                 # conn.put(floatify(o))
             elif msg[0] == 'step':
-                ordi = e.step(msg[1])
-                ordi[0] = floatify(ordi[0])
-                cq.put(ordi)
+                o,r,d,i = e.step(msg[1])
+                o = floatify(o) # floatify the observation
+                cq.put((o,r,d,i))
                 # conn.put(ordi)
                 # conn.send(ordi)
             else:
@@ -127,6 +127,7 @@ class ei: # Environment Instance
         self.lock.acquire()
         if self.is_occupied() == False:
             self.occupied = True
+            self.id = get_eid()
             self.lock.release()
             return True # on success
         else:
@@ -134,7 +135,10 @@ class ei: # Environment Instance
             return False # failed
 
     def release(self):
+        self.lock.acquire()
         self.occupied = False
+        self.id = get_eid()
+        self.lock.release()
 
     # create a new RunEnv in a new process.
     def newproc(self):
@@ -172,7 +176,7 @@ class ei: # Environment Instance
         # if isinstance(r,tuple):
         if r[0] == 'error':
             # read the exception string
-            e == r[1]
+            e = r[1]
             self.pretty('got exception')
             self.pretty(e)
 
