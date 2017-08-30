@@ -78,6 +78,14 @@ class fifo:
     def fromtail(self,index):
         return self.buf[(self.tail-index-1)%self.size]
 
+    def dump(self,reason):
+        # dump the content into file
+        with open('fifodump.txt','a') as f:
+            string = 'fifodump reason: {}\n'.format(reason)
+            for i in self.buf:
+                string+=str(i)+'\n'
+            string+='head:{} tail:{}\n'.format(self.head,self.tail)
+            f.write(string)
 
 # 41 dim to 48 dim
 def process_observation(observation):
@@ -141,12 +149,29 @@ def generate_observation(new, old=None, step=None):
 
     # deal with old
     if old is None:
-        old = {'dummy':None,'balls':[],'que':fifo(20)}
+        if step!=0:
+            raise Exception('step nonzero, old == None, how can you do such a thing?')
+
+        old = {'dummy':None,'balls':[],'que':fifo(200),'last':step-1}
         for i in range(6):
             old['que'].push(new)
 
     q = old['que']
-    q.pop() # remove head
+
+    if old['last']+1 != step:
+        raise Exception('step not monotonically increasing by one')
+    else:
+        old['last'] += 1
+
+    if step > 1: # bug in osim-rl
+        if q.fromtail(0)[36] != new[36]:
+            # if last obs and this obs have different psoas value
+            print('@step {} Damned'.format(step))
+            q.push(['compare(que, new):', q.fromtail(0)[36], new[36]])
+            q.dump(reason='obsmixed')
+            raise Exception('Observation mixed up, potential bug in parallel code.')
+
+    # q.pop() # remove head
     q.push(new) # add to tail
 
     # process new
@@ -200,6 +225,7 @@ def generate_observation(new, old=None, step=None):
                 if absolute_ball_pos < (b[0] - 1e-9):
                     print(absolute_ball_pos,balls)
                     print('(@ step )'+str(step)+')Damn! new ball closer than existing balls.')
+                    q.dump(reason='ballcloser')
                     raise Exception('new ball closer than the old ones.')
 
             balls.append([
@@ -210,12 +236,13 @@ def generate_observation(new, old=None, step=None):
             if len(balls)>3:
                 print(balls)
                 print('(@ step '+str(step)+')What the fuck you just did! Why num of balls became greater than 3!!!')
+                q.dump(reason='ballgt3')
                 raise Exception('ball number greater than 3.')
         else:
             pass # we already met this ball before.
 
-    if step > 5:
-        # ignore ghost obstacles, fuck the fucking organizer
+    if step > 0:
+        # initial observation is very wrong, due to implementation bug.
         addball_if_new()
 
     ball_vectors = []
