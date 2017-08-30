@@ -6,3 +6,6 @@ __pycache__
 apikey.txt
 /pretrained
 farmlist.py
+dump.csv
+dump.zip
+fifodump.txt
