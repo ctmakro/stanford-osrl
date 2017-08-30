@@ -198,6 +198,8 @@ def generate_observation(new, old=None, step=None):
             for b in balls:
                 # if this new ball is smaller in x than any ball there is
                 if absolute_ball_pos < (b[0] - 1e-9):
+                    print(absolute_ball_pos,balls)
+                    print('(@ step )'+str(step)+')Damn! new ball closer than existing balls.')
                     raise Exception('new ball closer than the old ones.')
 
             balls.append([
