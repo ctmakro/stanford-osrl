@@ -81,7 +81,7 @@ plock = multiprocessing.Lock()
 tlock = threading.Lock()
 
 # global id issurance
-eid = int(random.random()*1000)
+eid = int(random.random()*100000)
 def get_eid():
     global eid,tlock
     tlock.acquire()
