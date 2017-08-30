@@ -127,9 +127,9 @@ class farmer:
                         failures[idx] += 4
                         continue
                     else: # result is an id
-                        id = result
-                        renv = remoteEnv(fp,id) # build remoteEnv around the proxy
-                        self.pretty('got one on '+address+' '+str(id))
+                        eid = result
+                        renv = remoteEnv(fp,eid) # build remoteEnv around the proxy
+                        self.pretty('got one on {} id:{}'.format(address,eid))
                         ret = renv
                         break
 
