@@ -16,6 +16,9 @@ more details at <https://github.com/stanfordnmbl/osim-rl>
   - numpy, gym
   - osim-rl
   - OpenCV3
+  - Pyro4
+  - parse
+  - IPython (for convenience)
 
 # To Run
 
@@ -24,6 +27,17 @@ $ ipython -i ddpg2.py
 ```
 
 then enter `r(100)` to train the agent for 100 episodes.
+
+# Parallelism
+
+
+Current version requires farming. Before starting `ddpg2.py`, you should first start a farm, preferable with Python 2.7, by running `python farm.py`. Then create a `farmlist.py` in the working directory with the following content:
+
+```py
+farmlist_base = [('127.0.0.1', 4)] # start a pool of 4 on this IP address
+```
+
+Then start `ipython -i ddpg2.py`. The farmer should be able to reach the farm on your local machine. You can now type `r(100)` to train.
 
 # Note for users on Win7 x64 + Python 3.5 (2017-07-06)
 
