@@ -318,7 +318,7 @@ class nnagent(object):
         total_size = batch_size
         epochs = 1
 
-        self.lock.acquire()
+        # self.lock.acquire()
         if memory.size() > total_size * 128:
 
             #if enough samples in memory
@@ -329,7 +329,7 @@ class nnagent(object):
 
                 self.feed([s1,a1,r1,isdone,s2])
 
-        self.lock.release()
+        # self.lock.release()
 
     def feed_one(self,tup):
         self.rpm.add(tup)
@@ -435,9 +435,9 @@ class nnagent(object):
 
         # actions = actor.infer(obs)
         # q = critic.infer([obs,actions])[0]
-        self.lock.acquire()
+        # self.lock.acquire()
         [actions,q] = self.joint_inference(obs)
-        self.lock.release()
+        # self.lock.release()
 
         actions,q = actions[0],q[0]
 
@@ -447,9 +447,9 @@ class nnagent(object):
 
             noise = curr_noise * 5 - np.arange(self.outputdims) * 12.0 - 30
 
-            self.lock.acquire()
+            # self.lock.acquire()
             self.loggraph(np.hstack([disp_actions,noise,q]))
-            self.lock.release()
+            # self.lock.release()
             # temporarily disabled.
         return actions
 
@@ -484,7 +484,7 @@ if __name__=='__main__':
     agent = nnagent(
     processed_dims,
     e.action_space,
-    discount_factor=.98,
+    discount_factor=.99,
     # .99 = 100 steps = 4 second lookahead
     # .985 = somewhere in between.
     # .98 = 50 steps = 2 second lookahead
@@ -566,7 +566,7 @@ if __name__=='__main__':
             # playtwice(times)
             playifavailable(nl)
 
-            time.sleep(0.1)
+            time.sleep(0.05)
 
             if (i+1) % 1000 == 0:
                 # save the training result.
