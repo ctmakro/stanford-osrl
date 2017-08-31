@@ -26,18 +26,23 @@ class farmlist:
         self.list.append((addr,capa))
 
 fl = farmlist()
-from farmlist import farmlist_base
-for item in farmlist_base:
-    fl.push(item[0],item[1])
 
-# call fl.push(addr, capa) to add server to list
-# call refresh_addresses() to apply the new list
-
-def refresh_addresses():
+def reload_addr():
     global addresses,capacities,failures
+
+    g = {'nothing':0}
+    with open('farmlist.py','r') as f:
+        farmlist_py = f.read()
+    exec(farmlist_py,g)
+    farmlist_base = g['farmlist_base']
+
+    fl.list = []
+    for item in farmlist_base:
+        fl.push(item[0],item[1])
+
     addresses,capacities,failures = fl.generate()
 
-refresh_addresses()
+reload_addr()
 
 class remoteEnv:
     def pretty(self,s):
@@ -74,6 +79,10 @@ class remoteEnv:
         self.rel()
 
 class farmer:
+    def reload_addr(self):
+        self.pretty('reloading farm list...')
+        reload_addr()
+
     def pretty(self,s):
         print('(farmer) '+str(s))
 
