@@ -1,10 +1,14 @@
-# Stanford OpenSim RL NIPS2017
+# Stanford/EPFL NIPS2017 RL Competition w/ OpenSim
 
 you know, to walk the skeleton.
 
 original DDPG code from <https://github.com/ctmakro/gymnastics>
 
 more details at <https://github.com/stanfordnmbl/osim-rl>
+
+# What on earth is EPFL
+
+École polytechnique fédérale de Lausanne (School Polytechnical Federal of Lausanne), the MIT of Switzerland. They seem to speak French.
 
 # Dependencies
 
