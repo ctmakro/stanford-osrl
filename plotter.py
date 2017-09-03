@@ -1,6 +1,7 @@
-from multiprocessing import Process, Pipe
+import time, os
+from ipc import ipc
 
-def remote_plotter(conn,num_lines):
+def remote_plotter_callback(conn):
     import matplotlib.pyplot as plt
     import time
     import threading as th
@@ -19,14 +20,19 @@ def remote_plotter(conn,num_lines):
             self.ax = self.fig.add_subplot(1,1,1)
 
             plt.show(block=False)
+            # plt.show()
+
+            self.something_new = True
 
         def show(self):
-            self.ax.clear()
             self.lock.acquire()
-            for y in self.ys:
-                self.ax.plot(self.x,y)
+            if self.anything_new():
+                self.ax.clear()
+                for y in self.ys:
+                    self.ax.plot(self.x,y)
             self.lock.release()
-            plt.draw()
+            plt.pause(0.2)
+            # plt.draw()
 
         def pushy(self,y):
             self.lock.acquire()
@@ -35,6 +41,7 @@ def remote_plotter(conn,num_lines):
                 self.x.append(self.x[-1]+1)
             else:
                 self.x.append(0)
+            self.something_new = True
             self.lock.release()
 
         def pushys(self,ys):
@@ -46,72 +53,53 @@ def remote_plotter(conn,num_lines):
                 self.x.append(self.x[-1]+1)
             else:
                 self.x.append(0)
+            self.something_new = True
             self.lock.release()
 
-    p = plotter(num_lines)
+        def anything_new(self):
+            # self.lock.acquire()
+            n = self.something_new
+            self.something_new = False
+            # self.lock.release()
+            return n
 
+    p = None
     endflag = False
-    def msgloop():
-        while True:
+
+    # wait for init parameters
+    while 1:
+        msg = conn.recv()
+        if p is None:
+            if msg[0] == 'init':
+                p = plotter(msg[1])
+                break
+
+    def receive_loop():
+        while 1:
             msg = conn.recv()
-
-            # messages should be tuples,
-            # msg[0] should be string
-
             if msg[0] == 'pushys':
                 p.pushys(msg[1])
-            elif msg[0] == 'show':
-                p.show()
             else:
-                conn.close()
-                endflag=True
                 return
 
-    t = th.Thread(target = msgloop, daemon = True)
-    t.start()
+    th.Thread(target = receive_loop, daemon = True).start()
 
-    last_xlen = 0
-    def showable():
-        nonlocal last_xlen
-        p.lock.acquire()
-        xlen = len(p.x)
-        if xlen> last_xlen:
-            last_xlen = xlen
-            canshow = True
-        else:
-            canshow = False
-        p.lock.release()
-        return canshow
+    while 1:
+        p.show()
 
-    while True:
-        if showable():
-            p.show()
-        plt.pause(0.2)
-        if endflag:
-            return
-
-class interprocess_plotter:
+class interprocess_plotter(ipc):
     def __init__(self,num_lines=1):
-        self.pc, cc = Pipe()
-        self.p = Process(target = remote_plotter, args=(cc,num_lines), daemon=True)
-        self.p.start()
+        super().__init__(remote_plotter_callback)
+        self.send(('init',num_lines))
 
     def pushys(self,ys):
-        self.pc.send(('pushys', ys))
-
-    def show(self):
-        self.pc.send(('show',))
-
-    def __del__(self):
-        self.pc.send(('exit',))
-        print('(ip)waiting for join...')
-        self.p.join()
+        self.send(('pushys', ys))
 
 if __name__=='__main__':
-    ip = interprocess_plotter()
+    ip = interprocess_plotter(2)
     import math,time
     for i in range(100):
-        ip.pushy(math.sin(i/10))
+        ip.pushys([math.sin(i/10), math.sin(i/10+2)])
         time.sleep(0.05)
 
     time.sleep(5)
