@@ -1,4 +1,4 @@
-# Stanford OpenSim RL NIPS2017
+# Stanford/EPFL NIPS2017 RL Competition w/ OpenSim
 
 you know, to walk the skeleton.
 
@@ -6,17 +6,23 @@ original DDPG code from <https://github.com/ctmakro/gymnastics>
 
 more details at <https://github.com/stanfordnmbl/osim-rl>
 
+# What on earth is EPFL
+
+École polytechnique fédérale de Lausanne (School Polytechnical Federal of Lausanne), the MIT of Switzerland. They seem to speak French.
+
 # Dependencies
 
-  - Python 3.5
+  - Python 3.5 (for training with TF on Windows)
+  - Python 2.7 (for running osim-rl on Windows)
+  - Anaconda/Miniconda (for the harmony of the two above)
   - TF
   - matplotlib
   - pymsgbox (act as a stop button instead of using ctrl-c)
-  - Canton
+  - Canton (No.1 DL library on earth)
   - numpy, gym
-  - osim-rl
-  - OpenCV3
-  - Pyro4
+  - osim-rl (the competition)
+  - OpenCV3 (waterfall graph)
+  - Pyro4 (RPC)
   - parse
   - IPython (for convenience)
 
@@ -42,6 +48,8 @@ Then start `ipython -i ddpg2.py`. The farmer should be able to reach the farm on
 # Note for users on Win7 x64 + Python 3.5 (2017-07-06)
 
 Assume you want to run osim-rl on Windows w/py35, since TensorFlow support only Python 3.5 on Windows.
+
+> Edit: this is not encouraged. Start your env in Py27 and talk to it from Py35 is more sustainable.
 
 1. Build OpenSim yourself (since @kidzik didn't do this for us)
     - Install VC++ 2015 build tools. Should not take long
