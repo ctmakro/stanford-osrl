@@ -161,16 +161,16 @@ class nnagent(object):
         rect = Act('lrelu',alpha=0.2)
         # rect = Act('elu')
         d1 = c.add(Dense(inputdims,256))
-        # d1a = c.add(Dense(256,128))
-        d2 = c.add(Dense(256,outputdims))
+        d1a = c.add(Dense(256,128))
+        d2 = c.add(Dense(128,outputdims))
 
         def call(i):
             i = Lambda(lambda x:x/3)(i) # downscale
-            l1 = rect(d1(i))
-            # l1a = rect(d1a(l1))
-            l2 = rect(d2(l1))
+            i = rect(d1(i))
+            i = rect(d1a(i))
+            i = rect(d2(i))
             # l2 = Lambda(lambda x:x/8)(l2) # downscale a bit
-            return l2
+            return i
         c.set_function(call)
         return c
 
@@ -205,10 +205,10 @@ class nnagent(object):
         den0 = c.add(self.create_common_network(inputdims,128))
         # den1 = c.add(Dense(256, 256))
         den2 = c.add(Dense(128+actiondims, 128))
-        den3 = c.add(Dense(128,64))
-        den4 = c.add(Dense(64,1))
+        den3 = c.add(Dense(128,128))
+        den4 = c.add(Dense(128,1))
 
-        rect = Act('lrelu',alpha = 0.2)
+        rect = Act('lrelu',alpha=0.2)
         # rect = Act('elu')
 
         def call(i):
@@ -484,7 +484,7 @@ if __name__=='__main__':
     agent = nnagent(
     processed_dims,
     e.action_space,
-    discount_factor=.99,
+    discount_factor=.98,
     # .99 = 100 steps = 4 second lookahead
     # .985 = somewhere in between.
     # .98 = 50 steps = 2 second lookahead
