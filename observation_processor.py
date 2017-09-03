@@ -54,6 +54,8 @@ radius of heel and toe ball: 0.05
 
 '''
 
+import numpy as np
+
 class fifo:
     def __init__(self,size):
         self.size = size
@@ -92,13 +94,12 @@ def process_observation(observation):
     o = list(observation) # an array
 
     pr = o[0]
-    o[0]/=4
 
     px = o[1]
     py = o[2]
 
     pvr = o[3]
-    o[3] /=4
+
     pvx = o[4]
     pvy = o[5]
 
@@ -114,18 +115,23 @@ def process_observation(observation):
 
     o[18] -= px # mass pos xy made relative
     o[19] -= py
-    o[20] -= pvx
+    o[20] -= pvx # mass vel xy made relative
     o[21] -= pvy
 
     o[38]= min(4,o[38])/3 # ball info are included later in the stage
     # o[39]/=5
     # o[40]/=5
 
+    o[0]/=4 # divide pr by 4
     o[1]=0 # abs value of pel x is not relevant
-    o[2]-= 0.5
+    o[2]-= 0.5 # minus py by 0.5
 
-    o[4]/=2
-    o[5]/=2
+    o[3] /=4 # divide pvr by 4
+    o[4] /=10 # divide pvx by 10
+    o[5] /=10
+
+    o[20]/=10
+    o[21]/=10
 
     return o
 
@@ -133,15 +139,9 @@ _stepsize = 0.01
 flatten = lambda l: [item for sublist in l for item in sublist]
 
 # expand observation from 48 to 48*7 dims
-processed_dims = 48 + 14*5 + 9 + 8
+processed_dims = 48 + 14*5 + 9 + 1 + 8
 # processed_dims = 41*8
 def generate_observation(new, old=None, step=None):
-
-    # # debug
-    # import random
-    # if random.random()>0.01:
-    #     print('(debug)',new)
-
 
     global _stepsize
     if step is None:
@@ -152,7 +152,7 @@ def generate_observation(new, old=None, step=None):
         if step!=0:
             raise Exception('step nonzero, old == None, how can you do such a thing?')
 
-        old = {'dummy':None,'balls':[],'que':fifo(200),'last':step-1}
+        old = {'dummy':None,'balls':[],'que':fifo(1200),'last':step-1}
         for i in range(6):
             old['que'].push(new)
 
@@ -189,8 +189,8 @@ def generate_observation(new, old=None, step=None):
         for t in [0,1]]
     # [[14][14]]
 
-    fv = [v/2 for v in flatten(vels)]
-    fa = [a/4 for a in flatten(accs)]
+    fv = [v/10 for v in flatten(vels)]
+    fa = [a/50 for a in flatten(accs)]
     final_observation = new_processed + fv + fa
     # 48+14*5
 
@@ -272,6 +272,11 @@ def generate_observation(new, old=None, step=None):
     final_observation[1] = episode_end_indicator
     #
     # final_observation += [episode_end_indicator]
+
+    flat_ahead_indicator = np.clip((current_pelvis - 5.0)/2, 0.0, 1.0)
+    # 0 at 5m, 1 at 7m
+
+    final_observation += [flat_ahead_indicator]
 
     foot_touch_indicators = []
     for i in [29,31,33,35]: # y of toes and taluses
