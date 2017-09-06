@@ -1,24 +1,26 @@
 import numpy as np
 import time
-import threading as td
 
-class wavegraph(object):
-    def __init__(self,dims,name,colors):
-        self.dims = dims
-        self.lastshow = time.time()
-        self.lastq = np.zeros((dims,))
+def remote_wavegraph_callback(conn):
+    class wavegraph:
+        def __init__(self,params):
+            dims,name,colors = params
 
-        self.name = name
-        self.imgw = 200
-        self.imgh = max(300, dims*12+60 + 20)
+            self.dims = dims
+            self.lastshow = time.time()
+            self.lastq = np.zeros((dims,))
 
-        self.im = np.zeros((self.imgh,self.imgw,3),dtype='float32')
-        self.cursor = 0
+            self.name = name
+            self.imgw = 200
+            self.imgh = max(300, dims*12+60 + 20)
 
-        self.colors = colors
-        self.que = []
+            self.im = np.zeros((self.imgh,self.imgw,3),dtype='float32')
+            self.cursor = 0
 
-        def _one():
+            self.colors = colors
+            self.que = []
+
+        def paintloop(self):
             import cv2
             while True:
                 time.sleep(0.032) #30 fps
@@ -45,10 +47,12 @@ class wavegraph(object):
                     dlq = np.floor(-self.lastq+imgh/2).astype('int32')
 
                     for i,k in enumerate(dq):
-                        if dq[i]+1>dlq[i]: dq[i],dlq[i] = dlq[i],dq[i]
-                        if dq[i]==dlq[i]: dlq[i]+=1
+                        mi = min(dq[i], dlq[i])
+                        ma = max(dq[i], dlq[i])
 
-                        im[dq[i]:dlq[i],cursor] += (1.5/(dlq[i]-dq[i]))**0.4 * self.colors[i]
+                        if mi==ma: ma+=1
+
+                        im[mi:ma,cursor] += (1.5/((ma-mi)))**0.4 * self.colors[i]
 
                     self.lastq = q
 
@@ -67,8 +71,40 @@ class wavegraph(object):
                     cv2.waitKey(1)
                     cv2.waitKey(1)
 
-        self.painter = td.Thread(target=_one,daemon=True) # dead on exit
-        self.painter.start()
+        # self.painter = td.Thread(target=_one,daemon=True) # dead on exit
+        # self.painter.start()
+        def one(self,q):
+            self.que.append(np.array(q))
 
+    w = None
+    endflag = False
+
+    # wait for init parameters
+    while 1:
+        msg = conn.recv()
+        if w is None:
+            if msg[0] == 'init':
+                w = wavegraph(msg[1])
+                break
+
+    def receive_loop():
+        while 1:
+            msg = conn.recv()
+            if msg[0] == 'one':
+                w.one(msg[1])
+            else:
+                return
+
+    import threading as th
+    th.Thread(target = receive_loop, daemon = True).start()
+    w.paintloop()
+
+from ipc import ipc
+class wavegraph(ipc):
+    def __init__(self,dims,name,colors):
+        super().__init__(remote_wavegraph_callback)
+        self.pretty('wavegraph initializing...')
+        self.send(('init',(dims,name,colors)))
     def one(self,q):
-        self.que.append(q)
+        q = [float(i) for i in q]
+        self.send(('one',q))
