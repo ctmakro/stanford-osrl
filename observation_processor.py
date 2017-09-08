@@ -280,8 +280,10 @@ def generate_observation(new, old=None, step=None):
 
     foot_touch_indicators = []
     for i in [29,31,33,35]: # y of toes and taluses
-        touch_ind = 1 if new[i] < 0.05 else 0
-        touch_ind2 = 1 if new[i] < 0.1 else 0
+        # touch_ind = 1 if new[i] < 0.05 else 0
+        touch_ind = np.clip(0.05 - new[i] * 10 + 0.5, 0., 1.)
+        touch_ind2 = np.clip(0.1 - new[i] * 10 + 0.5, 0., 1.)
+        # touch_ind2 = 1 if new[i] < 0.1 else 0
         foot_touch_indicators.append(touch_ind)
         foot_touch_indicators.append(touch_ind2)
     final_observation+=foot_touch_indicators # 8dim
