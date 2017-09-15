@@ -2,9 +2,19 @@ import time, os
 from ipc import ipc
 
 def remote_plotter_callback(conn):
-    import matplotlib.pyplot as plt
+    import matplotlib
     import time
     import threading as th
+
+    from sys import platform as _platform
+
+    if _platform == "darwin":
+        # MAC OS X
+        matplotlib.use('qt5Agg')
+        # avoid using cocoa backend, avoid using framework build.
+        # conda install pyqt
+
+    import matplotlib.pyplot as plt
 
     class plotter:
         def __init__(self,num_lines=1):
@@ -13,6 +23,14 @@ def remote_plotter_callback(conn):
             self.y = []
             self.num_lines = num_lines
             self.ys = [[] for i in range(num_lines)]
+
+            self.colors = [
+                [
+                    (i*i*7.9+i*19/2.3+17/3.1)%0.5+0.2,
+                    (i*i*9.1+i*23/2.9+31/3.7)%0.5+0.2,
+                    (i*i*11.3+i*29/3.1+37/4.1)%0.5+0.2,
+                ]
+                for i in range(num_lines)]
 
             self.time = time.time()
 
@@ -28,8 +46,28 @@ def remote_plotter_callback(conn):
             self.lock.acquire()
             if self.anything_new():
                 self.ax.clear()
-                for y in self.ys:
-                    self.ax.plot(self.x,y)
+                self.ax.grid(color='#f0f0f0', linestyle='solid', linewidth=1)
+
+                x = self.x
+
+                for idx in range(len(self.ys)):
+                    y = self.ys[idx]
+                    c = self.colors[idx]
+                    self.ax.plot(x,y,color=tuple(c))
+
+                for idx in range(len(self.ys)):
+                    y = self.ys[idx]
+                    c = self.colors[idx]
+                    init = 5
+                    if len(y)>init:
+                        ysmooth = [sum(y[0:init])/init]*init
+                        for i in range(init,len(y)): # first order
+                            ysmooth.append(ysmooth[-1]*0.9+y[i]*0.1)
+                        for i in range(init,len(y)): # second order
+                            ysmooth[i] = ysmooth[i-1]*0.9+ysmooth[i]*0.1
+
+                        self.ax.plot(x,ysmooth,lw=2,color=tuple([cp**0.3 for cp in c]),alpha=0.5)
+
             self.lock.release()
             plt.pause(0.2)
             # plt.draw()
