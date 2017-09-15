@@ -9,6 +9,9 @@ import math, time
 
 # given an environment, start stepping through it when signaled. yield trajectories every [horizon] steps.
 class SingleEnvSampler:
+    def get_env(self):
+        return self.env
+
     def __init__(self,env,agent):
         self.env = env
         self.agent = agent
@@ -22,7 +25,7 @@ class SingleEnvSampler:
             # length we are going to collect
             # horizon = self.agent.horizon
 
-            env = self.env
+            env = self.get_env()
             print('collecting trajectory...')
 
             # things we have to collect
@@ -36,69 +39,84 @@ class SingleEnvSampler:
             steps = 0
 
             while 1:
-                # episode start
-                episode_total_reward = 0
-                episode_length = 0
+                try: # catch every possible error
+                    # episode start
+                    episode_total_reward = 0
+                    episode_length = 0
 
-                # initial observation
-                ob = env.reset()
-                while 1:
-                    # sample action from given policy
-                    mean, sto, val_pred = self.agent.act(ob)
-                    # policy_out, val_pred = self.act(ob)
-                    # sto_action = 1.0*(policy_out > noise_sample())
-                    sto_action = sto
-                    # sto_action = noise_sample() * std + mean
-                    # sto_limited = self.action_limiter(sto_action)
-                    mean_limited, sto_limited = self.agent.action_limiter(mean), self.agent.action_limiter(sto_action)
+                    # initial observation
+                    ob = env.reset()
+                    while 1:
+                        # sample action from given policy
+                        mean, sto, val_pred = self.agent.act(ob)
+                        # policy_out, val_pred = self.act(ob)
+                        # sto_action = 1.0*(policy_out > noise_sample())
+                        sto_action = sto
+                        # sto_action = noise_sample() * std + mean
+                        # sto_limited = self.action_limiter(sto_action)
+                        mean_limited, sto_limited = self.agent.action_limiter(mean), self.agent.action_limiter(sto_action)
 
-                    # logging actions. comment out if you don't have opencv
-                    if True:
-                        # mean_limited = self.action_limiter(mean)
-                        disp_mean = mean_limited*5. + np.arange(policy.ac_dims)*12 + 30
-                        disp_sto = sto_limited*5. - np.flipud(np.arange(policy.ac_dims))*12 - 30
-                        self.agent.loggraph(np.hstack([disp_mean, disp_sto, val_pred]))
+                        # logging actions. comment out if you don't have opencv
+                        if True:
+                            # mean_limited = self.action_limiter(mean)
+                            disp_mean = mean_limited*5. + np.arange(policy.ac_dims)*12 + 30
+                            disp_sto = sto_limited*5. - np.flipud(np.arange(policy.ac_dims))*12 - 30
+                            self.agent.loggraph(np.hstack([disp_mean, disp_sto, val_pred]))
 
-                    # step environment with action and obtain reward
-                    new_ob, reward, done, info = env.step(sto_limited)
+                        # step environment with action and obtain reward
+                        new_ob, reward, done, info = env.step(sto_limited)
 
-                    # if steps%100==0:
-                    #     env.render()
+                        # if steps%100==0:
+                        #     env.render()
 
-                    # append data into collection
-                    s1.append(ob)
-                    a1.append(sto_action)
-                    r1.append(reward)
-                    _done.append(1 if done else 0)
+                        # append data into collection
+                        s1.append(ob)
+                        a1.append(sto_action)
+                        r1.append(reward)
+                        _done.append(1 if done else 0)
 
-                    ob = new_ob # assign new_ob to prev ob
+                        ob = new_ob # assign new_ob to prev ob
 
-                    # counting
-                    episode_total_reward+=reward
-                    episode_length+=1
-                    steps+=1
+                        # counting
+                        episode_total_reward+=reward
+                        episode_length+=1
+                        steps+=1
 
-                    # if episode is done, either natually or forcifully
-                    if done or episode_length >= 1600:
-                        done = 1
-                        _done[-1] = 1
-                        print('episode {} done in {} steps, total reward:{}'.format(
-                            ep+1, episode_length, episode_total_reward,
-                        ))
-                        self.agent.plotter.pushys([ep,episode_total_reward])
-                        # break
+                        # if episode is done, either natually or forcifully
+                        if done or episode_length >= 1600:
+                            done = 1
+                            _done[-1] = 1
+                            print('episode {} done in {} steps, total reward:{}'.format(
+                                ep+1, episode_length, episode_total_reward,
+                            ))
+                            self.agent.plotter.pushys([ep,episode_total_reward])
 
-                    if steps % self.horizon == 0: # if enough steps collected
-                        s2 = new_ob
-                        s1.append(s2)
-                        yield [s1,a1,r1,_done]
-                        s1,a1,r1,_done = [],[],[],[] # clear collection
-                        ep = 0
+                            env = self.get_env()
+                            # break
 
-                    if done:
-                        break
+                        if steps % self.horizon == 0: # if enough steps collected
+                            s2 = new_ob
+                            s1.append(s2)
+                            yield [s1,a1,r1,_done]
+                            s1,a1,r1,_done = [],[],[],[] # clear collection
+                            ep = 0
 
-                ep+=1
+                        if done:
+                            break
+                    ep+=1
+                except e as Exception:
+                    # if exception ever happens
+                    print('(SingleEnvSampler) something wrong in loop. episode teminates now')
+                    traceback.print_exc()
+                    print(e)
+
+                    # now try your best to recover:
+                    s1,a1,r1,_done = [],[],[],[] # clear collection
+                    ep = 0
+                    steps = 0
+                    env = self.get_env()
+                else:
+                    pass # do nothing
 
         def loop():
             traj_generator = collect_trajectories_longrunning()
