@@ -1,4 +1,5 @@
-from multiprocessing import Process, Queue
+import multiprocessing as mp
+# from multiprocessing import Process, Queue
 import time, os
 
 class pretty:
@@ -36,10 +37,11 @@ class conn_master(conn):
 
 class ipc(pretty): # base for all interprocess communicating classes
     def __init__(self, f):
-        pq,cq = Queue(1), Queue(1)
+        ctx = mp.get_context('spawn') # eliminate problems with fork().
+        pq,cq = ctx.Queue(1), ctx.Queue(1)
         self.pc, self.cc = conn_master(pq, cq), conn_slave(cq,pq)
 
-        self.p = Process(target=f, args=(self.cc,), daemon=True)
+        self.p = ctx.Process(target=f, args=(self.cc,), daemon=True)
         self.pretty('starting process')
         self.p.start()
 
