@@ -408,8 +408,8 @@ class ppo_agent:
                 # logging actions. comment out if you don't have opencv
                 if True:
                     # mean_limited = self.action_limiter(mean)
-                    disp_mean = mean_limited*5. + np.arange(policy.ac_dims)*12 + 30
-                    disp_sto = sto_limited*5. - np.flipud(np.arange(policy.ac_dims))*12 - 30
+                    disp_mean = mean*10. + np.arange(policy.ac_dims)*12 + 30
+                    disp_sto = sto*10. - np.flipud(np.arange(policy.ac_dims))*12 - 30
                     self.loggraph(np.hstack([disp_mean, disp_sto, val_pred]))
 
                 # step environment with action and obtain reward
