@@ -1,8 +1,8 @@
-# Stanford/EPFL NIPS2017 RL Competition w/ OpenSim
+# My codebase for Stanford/EPFL NIPS2017 RL Competition w/ OpenSim
 
 you know, to walk the skeleton.
 
-original DDPG code from <https://github.com/ctmakro/gymnastics>
+original DDPG/PPO code from <https://github.com/ctmakro/gymnastics>
 
 more details at <https://github.com/stanfordnmbl/osim-rl>
 
@@ -33,6 +33,12 @@ $ ipython -i ddpg2.py
 ```
 
 then enter `r(100)` to train the agent for 100 episodes.
+
+For PPO implementation, just change the filename:
+
+```bash
+$ ipython -i ppo3.py
+```
 
 # Parallelism
 
