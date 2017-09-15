@@ -106,7 +106,7 @@ class MultiCategoricalContinuous(MultiCategorical):
         return ret
 
     def neglogp(self, x):
-        x = tf.cast(x/self.scaler+1e-8, tf.int32) # integerization
+        x = tf.to_int32(tf.floor(x/self.scaler+1e-8)) # integerization
         return super().neglogp(x)
 
 # a simple MLP policy.
@@ -184,6 +184,7 @@ class ppo_agent:
         policy=None
         ):
         if policy is None:
+            print('no policy designated, use default Policy')
             policy = Policy
         self.current_policy = policy(ob_space, ac_space)
         self.old_policy = policy(ob_space, ac_space)
