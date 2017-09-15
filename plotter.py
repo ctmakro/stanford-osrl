@@ -1,3 +1,5 @@
+# interactive plotter that runs in a separate process.
+
 import time, os
 from ipc import ipc
 
@@ -11,7 +13,7 @@ def remote_plotter_callback(conn):
     if _platform == "darwin":
         # MAC OS X
         matplotlib.use('qt5Agg')
-        # avoid using cocoa backend, avoid using framework build.
+        # avoid using cocoa or TK backend, since they require using a framework build.
         # conda install pyqt
 
     import matplotlib.pyplot as plt
@@ -42,6 +44,17 @@ def remote_plotter_callback(conn):
 
             self.something_new = True
 
+        def custom_pause(self,interval):
+            # per https://stackoverflow.com/a/44352761
+            # and https://stackoverflow.com/a/45734500
+            # June 2017 sucks!
+            # calling plot() or pause() with newer matplotlib versions always focus the plot to foreground. to prevent this from happening, you have to use alternative methods to update the plot.
+
+            # also per https://github.com/matplotlib/matplotlib/pull/9061/commits/1f083e45fa5c022112967d2bfd966f073ffb42b0
+            if self.fig.canvas.figure.stale:
+                self.fig.canvas.draw()
+            self.fig.canvas.start_event_loop(interval)
+
         def show(self):
             self.lock.acquire()
             if self.anything_new():
@@ -69,8 +82,9 @@ def remote_plotter_callback(conn):
                         self.ax.plot(x,ysmooth,lw=2,color=tuple([cp**0.3 for cp in c]),alpha=0.5)
 
             self.lock.release()
-            plt.pause(0.2)
+            # plt.pause(0.2)
             # plt.draw()
+            self.custom_pause(0.2)
 
         def pushy(self,y):
             self.lock.acquire()
