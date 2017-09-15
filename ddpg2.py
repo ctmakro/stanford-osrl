@@ -159,13 +159,14 @@ class nnagent(object):
 
         c = Can()
         rect = Act('lrelu',alpha=0.2)
+        magic = 1/(0.5 + 0.5*0.2)
         # rect = Act('elu')
-        d1 = c.add(Dense(inputdims,256))
-        d1a = c.add(Dense(256,128))
-        d2 = c.add(Dense(128,outputdims))
+        d1 = c.add(Dense(inputdims,256,stddev=magic))
+        d1a = c.add(Dense(256,128,stddev=magic))
+        d2 = c.add(Dense(128,outputdims,stddev=magic))
 
         def call(i):
-            i = Lambda(lambda x:x/3)(i) # downscale
+            # i = Lambda(lambda x:x/3)(i) # downscale
             i = rect(d1(i))
             i = rect(d1a(i))
             i = rect(d2(i))
@@ -179,13 +180,14 @@ class nnagent(object):
         # add gaussian noise.
 
         rect = Act('relu',alpha=0.2)
+        magic = 1/(0.5 + 0.5*0.2)
         # rect = Act('elu')
 
         c = Can()
         c.add(self.create_common_network(inputdims,128))
         c.add(Dense(128,128))
         c.add(rect)
-        c.add(Dense(128,outputdims))
+        c.add(Dense(128,outputdims,stddev=1))
 
         if self.is_continuous:
             c.add(Act('tanh'))
@@ -198,18 +200,19 @@ class nnagent(object):
 
     # q = critic(s,a) : predict q given state and action
     def create_critic_network(self,inputdims,actiondims):
+        rect = Act('lrelu',alpha=0.2)
+        magic = 1/(0.5 + 0.5*0.2)
+        # rect = Act('elu')
+
         c = Can()
         concat = Lambda(lambda x:tf.concat(x,axis=1))
 
         # concat state and action
         den0 = c.add(self.create_common_network(inputdims,128))
         # den1 = c.add(Dense(256, 256))
-        den2 = c.add(Dense(128+actiondims, 128))
-        den3 = c.add(Dense(128,128))
-        den4 = c.add(Dense(128,1))
-
-        rect = Act('lrelu',alpha=0.2)
-        # rect = Act('elu')
+        den2 = c.add(Dense(128+actiondims, 128,stddev=magic))
+        den3 = c.add(Dense(128,48,stddev=magic))
+        den4 = c.add(Dense(48,1,stddev=1))
 
         def call(i):
             state = i[0]
@@ -217,10 +220,8 @@ class nnagent(object):
             i = den0(state)
 
             i = concat([i,action])
-            i = den2(i)
-            i = rect(i)
-            i = den3(i)
-            i = rect(i)
+            i = rect(den2(i))
+            i = rect(den3(i))
             i = den4(i)
 
             q = i
@@ -420,7 +421,8 @@ class nnagent(object):
         self.lock.acquire()
 
         for t in episode_memory:
-            self.feed_one(t)
+            if np.random.uniform()>0.5:
+                self.feed_one(t)
 
         self.plotter.pushys([total_reward,noise_level,(time.time()%3600)/3600-2])
         # self.noiseplotter.pushy(noise_level)
@@ -484,13 +486,13 @@ if __name__=='__main__':
     agent = nnagent(
     processed_dims,
     e.action_space,
-    discount_factor=.98,
+    discount_factor=.99,
     # .99 = 100 steps = 4 second lookahead
     # .985 = somewhere in between.
     # .98 = 50 steps = 2 second lookahead
     # .96 = 25 steps = 1 second lookahead
     stack_factor=1,
-    train_multiplier=2,
+    train_multiplier=1,
     )
 
     noise_level = 2.
@@ -524,7 +526,7 @@ if __name__=='__main__':
 
         # global noise_level
         # env = farmer.acq_env()
-        fenv = fastenv(env,4)
+        fenv = fastenv(env,2)
         agent.play(fenv,realtime=False,max_steps=-1,noise_level=nl)
         # epl.rel_env(env)
         env.rel()
