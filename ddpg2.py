@@ -211,7 +211,8 @@ class nnagent(object):
         den0 = c.add(self.create_common_network(inputdims,128))
         # den1 = c.add(Dense(256, 256))
         den2 = c.add(Dense(128+actiondims, 128,stddev=magic))
-        den3 = c.add(Dense(128,48,stddev=magic))
+        den3 = c.add(Dense(128,128,stddev=magic))
+        den3a = c.add(Dense(128,48,stddev=magic))
         den4 = c.add(Dense(48,1,stddev=1))
 
         def call(i):
@@ -222,6 +223,7 @@ class nnagent(object):
             i = concat([i,action])
             i = rect(den2(i))
             i = rect(den3(i))
+            i = rect(den3a(i))
             i = den4(i)
 
             q = i
@@ -497,7 +499,7 @@ if __name__=='__main__':
 
     noise_level = 2.
     noise_decay_rate = 0.001
-    noise_floor = 0.25
+    noise_floor = 0.05
     noiseless = 0.01
 
     from farmer import farmer as farmer_class
