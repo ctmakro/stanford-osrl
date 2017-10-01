@@ -139,7 +139,7 @@ _stepsize = 0.01
 flatten = lambda l: [item for sublist in l for item in sublist]
 
 # expand observation from 48 to 48*7 dims
-processed_dims = 48 + 14*5 + 9 + 1 + 8
+processed_dims = 48 + 14*4 + 9*0 + 1*0 + 8
 # processed_dims = 41*8
 def generate_observation(new, old=None, step=None):
 
@@ -181,18 +181,31 @@ def generate_observation(new, old=None, step=None):
     def bodypart_velocities(at):
         return [(q.fromtail(0+at)[i]-q.fromtail(1+at)[i])/_stepsize for i in range(22,36)]
 
-    vels = [bodypart_velocities(k) for k in [0,1,2]] #[[14][14][14]]
+    def relative_bodypart_velocities(at):
+        # velocities, but relative to pelvis.
+        bv = bodypart_velocities(at)
+        pv1,pv2 = bv[2],bv[3]
+        for i in range(len(bv)):
+            if i%2==0:
+                bv[i] -= pv1
+            else:
+                bv[i] -= pv2
+        return bv
+
+    vels = [bodypart_velocities(k) for k in [0,1]] #[[14][14]]
+    relvels = [relative_bodypart_velocities(k) for k in [0,]] #[[14]]
     accs = [
         [
             (vels[t][idx] - vels[t+1][idx])/_stepsize
             for idx in range(len(vels[0]))]
-        for t in [0,1]]
-    # [[14][14]]
+        for t in [0,]]
+    # [[14]]
 
     fv = [v/10 for v in flatten(vels)]
-    fa = [a/50 for a in flatten(accs)]
-    final_observation = new_processed + fv + fa
-    # 48+14*5
+    frv = [rv/10 for rv in flatten(relvels)]
+    fa = [a/10 for a in flatten(accs)]
+    final_observation = new_processed + fv + frv + fa
+    # 48+14*4
 
     # final_observation += flatten(
     #     [lp(q.fromtail(idx))[38:41] for idx in reversed([4,8,16,32,64])]
@@ -255,8 +268,8 @@ def generate_observation(new, old=None, step=None):
             falloff = min(1,max(0,3-abs(rel))) # when ball is closer than 3 falloff become 1
             ball_vectors.append([
                 min(4,max(-3, rel))/3, # ball pos relative to current pos
-                balls[i][1] * falloff, # radius
-                balls[i][2] * falloff, # height
+                balls[i][1] * 5 * falloff, # radius
+                balls[i][2] * 5 * falloff, # height
             ])
         else:
             ball_vectors.append([
@@ -266,17 +279,17 @@ def generate_observation(new, old=None, step=None):
             ])
 
     # 9-d
-    final_observation += flatten(reversed(ball_vectors))
+    # final_observation += flatten(reversed(ball_vectors))
 
-    episode_end_indicator = max(0, (step/1000-0.6))/10 # lights up when near end-of-episode
-    final_observation[1] = episode_end_indicator
+    # episode_end_indicator = max(0, (step/1000-0.6))/10 # lights up when near end-of-episode
+    # final_observation[1] = episode_end_indicator
     #
     # final_observation += [episode_end_indicator]
 
-    flat_ahead_indicator = np.clip((current_pelvis - 5.0)/2, 0.0, 1.0)
-    # 0 at 5m, 1 at 7m
-
-    final_observation += [flat_ahead_indicator]
+    # flat_ahead_indicator = np.clip((current_pelvis - 5.0)/2, 0.0, 1.0)
+    # # 0 at 5m, 1 at 7m
+    #
+    # final_observation += [flat_ahead_indicator]
 
     foot_touch_indicators = []
     for i in [29,31,33,35]: # y of toes and taluses
@@ -290,6 +303,13 @@ def generate_observation(new, old=None, step=None):
 
     # for i,n in enumerate(new_processed):
     #     print(i,n)
+
+    def final_processing(l):
+        # normalize to prevent excessively large input
+        for idx in range(len(l)):
+            if l[idx] > 1: l[idx] = np.sqrt(l[idx])
+            if l[idx] < -1: l[idx] = - np.sqrt(-l[idx])
+    final_processing(final_observation)
 
     return final_observation, old
 
