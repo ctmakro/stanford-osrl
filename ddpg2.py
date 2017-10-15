@@ -44,7 +44,7 @@ class nnagent(object):
     train_multiplier=1,
     ):
         self.rpm = rpm(1000000) # 1M history
-        self.plotter = plotter(num_lines=3)
+        self.plotter = plotter(num_lines=4)
         self.render = True
         self.training = True
         self.noise_source = one_fsq_noise()
@@ -157,13 +157,18 @@ class nnagent(object):
         # c.set_function(call)
         # return c
 
+        rect = Act('relu')
+        magic = 1
+        def d(i,o):
+            return LayerNormDense(i,o,stddev=magic)
+
         c = Can()
-        rect = Act('lrelu',alpha=0.2)
-        magic = 1/(0.5 + 0.5*0.2)
-        # rect = Act('elu')
-        d1 = c.add(Dense(inputdims,256,stddev=magic))
-        d1a = c.add(Dense(256,128,stddev=magic))
-        d2 = c.add(Dense(128,outputdims,stddev=magic))
+        # rect = Act('lrelu',alpha=0.2)
+        # magic = 1/(0.5 + 0.5*0.2)
+
+        d1 = c.add(d(inputdims,128))
+        d1a = c.add(d(128,128))
+        d2 = c.add(d(128,outputdims))
 
         def call(i):
             # i = Lambda(lambda x:x/3)(i) # downscale
@@ -179,14 +184,31 @@ class nnagent(object):
     def create_actor_network(self,inputdims,outputdims):
         # add gaussian noise.
 
-        rect = Act('relu',alpha=0.2)
-        magic = 1/(0.5 + 0.5*0.2)
+        rect = Act('lrelu',alpha=0.2)
         # rect = Act('elu')
+        magic = 1/(0.5 + 0.5*0.2)
+        # magic = 1 # we already have layernorm
+        # rect = Act('relu')
+        # magic = 2
+        # rect = Act('elu')
+        def d(i,o):
+            return LayerNormDense(i,o,stddev=magic)
+            # return Dense(i,o,stddev=magic)
 
         c = Can()
-        c.add(self.create_common_network(inputdims,128))
-        c.add(Dense(128,128))
+        # c.add(self.create_common_network(inputdims,64))
+        c.add(d(inputdims,256))
         c.add(rect)
+        # c.add(BatchNorm(512))
+        c.add(d(256,128))
+        c.add(rect)
+        # # c.add(BatchNorm(128))
+        c.add(d(128,128))
+        c.add(rect)
+        c.add(d(128,128))
+        c.add(rect)
+        # c.add(d(64,64))
+        # c.add(rect)
         c.add(Dense(128,outputdims,stddev=1))
 
         if self.is_continuous:
@@ -201,29 +223,39 @@ class nnagent(object):
     # q = critic(s,a) : predict q given state and action
     def create_critic_network(self,inputdims,actiondims):
         rect = Act('lrelu',alpha=0.2)
+        # rect = Act('relu')
         magic = 1/(0.5 + 0.5*0.2)
-        # rect = Act('elu')
+        # magic = 1 # we already have layernorm
+        # rect = Act('relu')
+        # magic = 2
+        def d(i,o):
+            return LayerNormDense(i,o,stddev=magic)
+            # return Dense(i,o,stddev=magic)
+#
 
         c = Can()
         concat = Lambda(lambda x:tf.concat(x,axis=1))
 
         # concat state and action
-        den0 = c.add(self.create_common_network(inputdims,128))
-        # den1 = c.add(Dense(256, 256))
-        den2 = c.add(Dense(128+actiondims, 128,stddev=magic))
-        den3 = c.add(Dense(128,128,stddev=magic))
-        den3a = c.add(Dense(128,48,stddev=magic))
-        den4 = c.add(Dense(48,1,stddev=1))
+        den0 = c.add(d(inputdims,256))
+        # den1 = c.add(Dense(256, 128))
+        den2 = c.add(d(256+actiondims, 128))
+        den3 = c.add(d(128,128))
+        # den3a = c.add(d(128,64))
+        den3b = c.add(d(128,128))
+        den4 = c.add(Dense(128,1,stddev=1))
 
         def call(i):
             state = i[0]
             action = i[1]
-            i = den0(state)
+            # i = rect((den0(state)))
+            i = (rect((den0(state))))
 
             i = concat([i,action])
-            i = rect(den2(i))
-            i = rect(den3(i))
-            i = rect(den3a(i))
+            i = (rect((den2(i))))
+            i = (rect((den3(i))))
+            # i = rect((den3a(i)))
+            i = rect((den3b(i)))
             i = den4(i)
 
             q = i
@@ -246,6 +278,17 @@ class nnagent(object):
         critic_loss = tf.reduce_mean((q1_target - q1_predict)**2)
         # produce better prediction
 
+        # # # huber loss per zzz
+        # diff = q1_target - q1_predict
+        # abs_diff = tf.abs(diff)
+        # sqr_diff = tf.square(diff)
+        # clipper = 1.0
+        # condition = tf.to_float(abs_diff < clipper)
+        # sqr_loss = 0.5 * sqr_diff
+        # linear_loss = clipper * (abs_diff - 0.5 * clipper)
+        # critic_loss = sqr_loss * condition + linear_loss * (1.0 - condition)
+        # critic_loss = tf.reduce_mean(critic_loss)
+
         # 2. update the actor
         a1_predict = self.actor(s1)
         q1_predict = self.critic([s1,a1_predict])
@@ -267,8 +310,10 @@ class nnagent(object):
             for i,_ in enumerate(cw)]
 
         # 4. inference
+        set_training_state(False)
         a_infer = self.actor(s1)
         q_infer = self.critic([s1,a_infer])
+        set_training_state(True)
 
         # 5. L2 weight decay on critic
         decay_c = tf.reduce_sum([tf.reduce_sum(w**2) for w in cw])* 1e-7
@@ -277,12 +322,14 @@ class nnagent(object):
         decay_c = 0
         decay_a = 0
 
-        # optimizer on
-        # actor is harder to stabilize...
+        # # optimizer on
+        # # actor is harder to stabilize...
         opt_actor = tf.train.AdamOptimizer(1e-4)
         opt_critic = tf.train.AdamOptimizer(3e-4)
-        # opt_actor = tf.train.RMSPropOptimizer(1e-3)
-        # opt_critic = tf.train.RMSPropOptimizer(1e-3)
+        # # opt_actor = tf.train.RMSPropOptimizer(1e-3)
+        # # opt_critic = tf.train.RMSPropOptimizer(1e-3)
+        opt = tf.train.AdamOptimizer(3e-4)
+        opt_actor,opt_critic = opt,opt
         cstep = opt_critic.minimize(critic_loss+decay_c, var_list=cw)
         astep = opt_actor.minimize(actor_loss+decay_a, var_list=aw)
 
@@ -293,7 +340,7 @@ class nnagent(object):
             res = sess.run([critic_loss,actor_loss,
                 cstep,astep,shift1,shift2],
                 feed_dict={
-                s1:s1d,a1:a1d,r1:r1d,isdone:isdoned,s2:s2d,tau:5e-4
+                s1:s1d,a1:a1d,r1:r1d,isdone:isdoned,s2:s2d,tau:1e-3
                 })
 
             #debug purposes
@@ -322,7 +369,7 @@ class nnagent(object):
         epochs = 1
 
         # self.lock.acquire()
-        if memory.size() > total_size * 128:
+        if memory.size() > total_size * 32:
 
             #if enough samples in memory
             for i in range(self.train_multiplier):
@@ -341,6 +388,7 @@ class nnagent(object):
     def play(self,env,max_steps=-1,realtime=False,noise_level=0.): # play 1 episode
         timer = time.time()
         noise_source = one_fsq_noise()
+        noise_source.skip = 1 # freq adj
 
         for j in range(200):
             noise_source.one((self.outputdims,),noise_level)
@@ -352,6 +400,8 @@ class nnagent(object):
 
         # removed: state stacking
         # moved: observation processing
+
+        noise_phase = int(np.random.uniform()*999999)
 
         try:
             observation = env.reset()
@@ -366,8 +416,28 @@ class nnagent(object):
 
             observation_before_action = observation # s1
 
-            exploration_noise = noise_source.one((self.outputdims,),noise_level)
+            phased_noise_anneal_duration = 100
+            # phased_noise_amplitude = ((-noise_phase-steps)%phased_noise_anneal_duration)/phased_noise_anneal_duration*2*np.pi
+            # phased_noise_amplitude = max(0.1,np.sin(phased_noise_amplitude))
+
+            phased_noise_amplitude = ((-noise_phase-steps)%phased_noise_anneal_duration)/phased_noise_anneal_duration
+            phased_noise_amplitude = max(0,phased_noise_amplitude*2-1)
+            phased_noise_amplitude = max(0.01,phased_noise_amplitude**2)
+
+            exploration_noise = noise_source.one((self.outputdims,),noise_level)*phased_noise_amplitude
+            # exploration_noise = np.random.normal(size=(self.outputdims,))*noise_level*phased_noise_amplitude
             # exploration_noise -= noise_level * 1
+
+            # exploration_noise = np.random.normal(size=(self.outputdims,))*0.
+            #
+            # # we want to add some shot noise
+            # shot_noise_prob = min(1, noise_level/5) # 0.05 => 1% shot noise
+            # shot_noise_replace = (np.random.uniform(size=exploration_noise.shape)<shot_noise_prob).astype('float32') # 0 entries passes thru, 1 entries shot noise.
+            #
+            # shot_noise_amplitude = np.random.uniform(size=exploration_noise.shape)*2-1
+            # # [-1, 1]
+            # # add shot noise!
+            # exploration_noise = exploration_noise*(1-shot_noise_replace) + shot_noise_amplitude*shot_noise_replace
 
             # self.lock.acquire() # please do not disrupt.
             action = self.act(observation_before_action, exploration_noise) # a1
@@ -378,7 +448,7 @@ class nnagent(object):
                 exploration_noise *= self.action_multiplier
                 # print(exploration_noise,exploration_noise.shape)
                 action += exploration_noise
-                action = self.clamper(action)
+                action = self.clamper(action) # don't clamp, see what happens.
                 action_out = action
             else:
                 raise RuntimeError('this version of ddpg is for continuous only.')
@@ -398,14 +468,15 @@ class nnagent(object):
 
             # feed into replay memory
             if self.training == True:
-                episode_memory.append((
-                    observation_before_action,action,reward,isdone,observation
-                ))
+                # episode_memory.append((
+                #     observation_before_action,action,reward,isdone,observation
+                # ))
 
                 # don't feed here since you never know whether the episode will complete without error.
-                # self.feed_one((
-                #     observation_before_action,action,reward,isdone,observation
-                # )) # s1,a1,r1,isdone,s2
+                # changed mind: let's feed here since this way the training dynamic is not disturbed
+                self.feed_one((
+                    observation_before_action,action,reward,isdone,observation
+                )) # s1,a1,r1,isdone,s2
                 # self.lock.acquire()
                 self.train(verbose=2 if steps==1 else 0)
                 # self.lock.release()
@@ -422,11 +493,11 @@ class nnagent(object):
         ))
         self.lock.acquire()
 
-        for t in episode_memory:
-            if np.random.uniform()>0.5:
-                self.feed_one(t)
+        # for t in episode_memory:
+        #     if np.random.uniform()>0.5:
+        #         self.feed_one(t)
 
-        self.plotter.pushys([total_reward,noise_level,(time.time()%3600)/3600-2])
+        self.plotter.pushys([total_reward,noise_level,(time.time()%3600)/3600-2,steps/1000-1])
         # self.noiseplotter.pushy(noise_level)
         self.lock.release()
 
@@ -488,7 +559,7 @@ if __name__=='__main__':
     agent = nnagent(
     processed_dims,
     e.action_space,
-    discount_factor=.99,
+    discount_factor=.98,
     # .99 = 100 steps = 4 second lookahead
     # .985 = somewhere in between.
     # .98 = 50 steps = 2 second lookahead
@@ -497,9 +568,9 @@ if __name__=='__main__':
     train_multiplier=1,
     )
 
-    noise_level = 2.
+    noise_level = 1
     noise_decay_rate = 0.001
-    noise_floor = 0.05
+    noise_floor = 0.1
     noiseless = 0.01
 
     from farmer import farmer as farmer_class
@@ -528,7 +599,7 @@ if __name__=='__main__':
 
         # global noise_level
         # env = farmer.acq_env()
-        fenv = fastenv(env,2)
+        fenv = fastenv(env,4) # 4 is skip factor
         agent.play(fenv,realtime=False,max_steps=-1,noise_level=nl)
         # epl.rel_env(env)
         env.rel()
@@ -559,11 +630,12 @@ if __name__=='__main__':
                 print('(run) stop signal received, stop at ep',i+1)
                 break
 
-            noise_level *= (1-noise_decay_rate)
-            # noise_level -= noise_decay_rate
+            # noise_level *= (1-noise_decay_rate)
+            noise_level -= noise_decay_rate
             noise_level = max(noise_floor, noise_level)
 
-            nl = noise_level if np.random.uniform()>0.05 else noiseless
+            # nl = noise_level if np.random.uniform()>0.05 else noiseless
+            nl = noise_level if i%20!=0 else noiseless
             # nl = noise_level * np.random.uniform() + 0.01
 
             print('ep',i+1,'/',ep,'times:',times,'noise_level',nl)
@@ -571,6 +643,7 @@ if __name__=='__main__':
             playifavailable(nl)
 
             time.sleep(0.05)
+            # time.sleep(1)
 
             if (i+1) % 1000 == 0:
                 # save the training result.
