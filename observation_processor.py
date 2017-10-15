@@ -118,15 +118,15 @@ def process_observation(observation):
     o[20] -= pvx # mass vel xy made relative
     o[21] -= pvy
 
-    o[38]= min(4,o[38])/3 # ball info are included later in the stage
+    o[38]= min(4,o[38])/2 # ball info are included later in the stage
     # o[39]/=5
     # o[40]/=5
 
-    o[0]/=4 # divide pr by 4
+    o[0]/=2 # divide pr by 4
     o[1]=0 # abs value of pel x is not relevant
     o[2]-= 0.5 # minus py by 0.5
 
-    o[3] /=4 # divide pvr by 4
+    o[3] /=2 # divide pvr by 4
     o[4] /=10 # divide pvx by 10
     o[5] /=10
 
@@ -139,7 +139,7 @@ _stepsize = 0.01
 flatten = lambda l: [item for sublist in l for item in sublist]
 
 # expand observation from 48 to 48*7 dims
-processed_dims = 48 + 14*4 + 9*0 + 1*0 + 8
+processed_dims = 48 + 14*1 + 9*1 + 1*1 + 8
 # processed_dims = 41*8
 def generate_observation(new, old=None, step=None):
 
@@ -204,7 +204,8 @@ def generate_observation(new, old=None, step=None):
     fv = [v/10 for v in flatten(vels)]
     frv = [rv/10 for rv in flatten(relvels)]
     fa = [a/10 for a in flatten(accs)]
-    final_observation = new_processed + fv + frv + fa
+    final_observation = new_processed + frv
+    # final_observation = new_processed + fv + frv + fa
     # 48+14*4
 
     # final_observation += flatten(
@@ -279,17 +280,17 @@ def generate_observation(new, old=None, step=None):
             ])
 
     # 9-d
-    # final_observation += flatten(reversed(ball_vectors))
+    final_observation += flatten(reversed(ball_vectors))
 
     # episode_end_indicator = max(0, (step/1000-0.6))/10 # lights up when near end-of-episode
     # final_observation[1] = episode_end_indicator
     #
     # final_observation += [episode_end_indicator]
 
-    # flat_ahead_indicator = np.clip((current_pelvis - 5.0)/2, 0.0, 1.0)
+    flat_ahead_indicator = np.clip((current_pelvis - 5.0)/2, 0.0, 1.0)
     # # 0 at 5m, 1 at 7m
     #
-    # final_observation += [flat_ahead_indicator]
+    final_observation += [flat_ahead_indicator]
 
     foot_touch_indicators = []
     for i in [29,31,33,35]: # y of toes and taluses
