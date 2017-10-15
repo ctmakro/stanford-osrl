@@ -17,6 +17,10 @@ def bind_alternative_pelvis_judgement(runenv):
     import types
     runenv.is_pelvis_too_low = types.MethodType(is_pelvis_too_low,runenv)
 
+# use custom episode length.
+def use_alternative_episode_length(runenv):
+    runenv.spec.timestep_limit = 2000
+
 # separate process that holds a separate RunEnv instance.
 # This has to be done since RunEnv() in the same process result in interleaved running of simulations.
 def standalone_headless_isolated(pq, cq, plock):
@@ -28,6 +32,7 @@ def standalone_headless_isolated(pq, cq, plock):
         from osim.env import RunEnv
         e = RunEnv(visualize=False)
         # bind_alternative_pelvis_judgement(e)
+        use_alternative_episode_length(e)
     except Exception as e:
         print('error on start of standalone')
         traceback.print_exc()
