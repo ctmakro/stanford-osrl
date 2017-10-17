@@ -41,7 +41,7 @@ observation:
 18-19 mass_pos xy
 20-21 mass_vel xy
 
-22-(22+7x2-1=35) bodypart_positions(x,y)
+22-(22+7x2-1=35) bodypart_positions(x,y) ## 22->head_x, 1->pelvis_x
 
 36-37 muscles psoas
 
@@ -139,7 +139,7 @@ _stepsize = 0.01
 flatten = lambda l: [item for sublist in l for item in sublist]
 
 # expand observation from 48 to 48*7 dims
-processed_dims = 48 + 14*1 + 9*1 + 1*1 + 8
+processed_dims = 48 + 14*1 + 9*1 + 1*0 + 8
 # processed_dims = 41*8
 def generate_observation(new, old=None, step=None):
 
@@ -248,10 +248,12 @@ def generate_observation(new, old=None, step=None):
                 current_ball_radius,
             ])
             if len(balls)>3:
-                print(balls)
-                print('(@ step '+str(step)+')What the fuck you just did! Why num of balls became greater than 3!!!')
-                q.dump(reason='ballgt3')
-                raise Exception('ball number greater than 3.')
+                # edit: since num_of_balls became 10, this check is removed.
+                pass
+                # print(balls)
+                # print('(@ step '+str(step)+')What the fuck you just did! Why num of balls became greater than 3!!!')
+                # q.dump(reason='ballgt3')
+                # raise Exception('ball number greater than 3.')
         else:
             pass # we already met this ball before.
 
@@ -263,14 +265,21 @@ def generate_observation(new, old=None, step=None):
     current_pelvis = new[1]
 
     # there should be at most 3 balls
+    # edit: there could be as much as 10 balls
     for i in range(3):
         if i<len(balls):
-            rel = balls[i][0] - current_pelvis
+            idx = len(balls)-1-i
+            # one ball: [0th none none]
+            # two balls: [1st 0th none]
+            # 3 balls: [2nd 1st 0th]
+            # 4 balls: [3rd 2nd 1st]
+
+            rel = balls[idx][0] - current_pelvis
             falloff = min(1,max(0,3-abs(rel))) # when ball is closer than 3 falloff become 1
             ball_vectors.append([
-                min(4,max(-3, rel))/3, # ball pos relative to current pos
-                balls[i][1] * 5 * falloff, # radius
-                balls[i][2] * 5 * falloff, # height
+                min(4,max(-3, rel))/3 * falloff, # ball pos relative to current pos
+                balls[idx][1] * 5 * falloff, # radius
+                balls[idx][2] * 5 * falloff, # height
             ])
         else:
             ball_vectors.append([
@@ -290,7 +299,7 @@ def generate_observation(new, old=None, step=None):
     flat_ahead_indicator = np.clip((current_pelvis - 5.0)/2, 0.0, 1.0)
     # # 0 at 5m, 1 at 7m
     #
-    final_observation += [flat_ahead_indicator]
+    # final_observation += [flat_ahead_indicator]
 
     foot_touch_indicators = []
     for i in [29,31,33,35]: # y of toes and taluses

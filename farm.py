@@ -30,9 +30,9 @@ def standalone_headless_isolated(pq, cq, plock):
     try:
         import traceback
         from osim.env import RunEnv
-        e = RunEnv(visualize=False)
+        e = RunEnv(visualize=False,max_obstacles=10)
         bind_alternative_pelvis_judgement(e)
-        use_alternative_episode_length(e)
+        # use_alternative_episode_length(e)
     except Exception as e:
         print('error on start of standalone')
         traceback.print_exc()
