@@ -40,13 +40,15 @@ For PPO implementation, just change the filename:
 $ ipython -i ppo3.py
 ```
 
-# Parallelism
+# Parallelism / Farming
 
 
-Current version requires farming (which is VERY IMPORTANT! Please read <https://github.com/stanfordnmbl/osim-rl/issues/58>). Before starting `ddpg2.py`, you should first start a farm, preferably with Python 2.7, by running `python farm.py`. Then create a `farmlist.py` in the working directory with the following content:
+Current version requires farming (which is VERY IMPORTANT! Please read <https://github.com/stanfordnmbl/osim-rl/issues/58>). Before starting `ddpg2.py`, you should first start one or more farm, preferably with Python 2.7, by running `python farm.py` on each machine you own. Then create a `farmlist.py` in the working directory with the following content:
 
 ```py
-farmlist_base = [('127.0.0.1', 4),('192.168.1.33',8)] # a farm of 4 instances in parallel is available on localhost, while a farm of 8 available on another machine
+farmlist_base = [('127.0.0.1', 4),('192.168.1.33',8)]
+# a farm of 4 cores is available on localhost, while a farm of 8 available on another machine.
+# expand the list if you have more machines.
 ```
 
 Then start `ipython -i ddpg2.py`. The farmer should be able to reach the farm on your local machine. You can now type `r(100)` to train.
