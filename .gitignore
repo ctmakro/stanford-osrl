@@ -3,7 +3,7 @@ __pycache__
 *.log
 *.npz
 *.pickle
-apikey.txt
+apikey*
 /pretrained
 farmlist.py
 dump.csv
