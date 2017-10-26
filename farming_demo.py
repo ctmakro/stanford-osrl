@@ -39,6 +39,8 @@ def play_ignore(env):
 def playifavailable(id):
     while True:
         remote_env = farmer.acq_env()
+        # just replace occurences of env = RunEnv() with the line above.
+
         # the remote_env obtained here is preconfigured in `farm.py`. please modify `farm.py` to change the parameters like difficulty or num_obstacles.
 
         if remote_env == False: # no free environment

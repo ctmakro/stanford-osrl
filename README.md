@@ -43,7 +43,7 @@ $ ipython -i ppo3.py
 # Parallelism
 
 
-Current version requires farming. Before starting `ddpg2.py`, you should first start a farm, preferable with Python 2.7, by running `python farm.py`. Then create a `farmlist.py` in the working directory with the following content:
+Current version requires farming (which is VERY IMPORTANT! Please read <https://github.com/stanfordnmbl/osim-rl/issues/58>). Before starting `ddpg2.py`, you should first start a farm, preferably with Python 2.7, by running `python farm.py`. Then create a `farmlist.py` in the working directory with the following content:
 
 ```py
 farmlist_base = [('127.0.0.1', 4),('192.168.1.33',8)] # a farm of 4 instances in parallel is available on localhost, while a farm of 8 available on another machine
