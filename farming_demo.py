@@ -1,4 +1,4 @@
-# this file is created to demonstrate how one can construct a client program that obtain RunEnv instances from a farm.
+# this file is created to demonstrate how one can construct a client program that obtains RunEnv instances from a farm.
 
 # instructions to start a farm is located in README.md
 
@@ -39,6 +39,8 @@ def play_ignore(env):
 def playifavailable(id):
     while True:
         remote_env = farmer.acq_env()
+        # the remote_env obtained here is preconfigured in `farm.py`. please modify `farm.py` to change the parameters like difficulty or num_obstacles.
+
         if remote_env == False: # no free environment
             # time.sleep(0.1)
             pass

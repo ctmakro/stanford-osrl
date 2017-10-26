@@ -46,10 +46,12 @@ $ ipython -i ppo3.py
 Current version requires farming. Before starting `ddpg2.py`, you should first start a farm, preferable with Python 2.7, by running `python farm.py`. Then create a `farmlist.py` in the working directory with the following content:
 
 ```py
-farmlist_base = [('127.0.0.1', 4)] # start a pool of 4 on this IP address
+farmlist_base = [('127.0.0.1', 4),('192.168.1.33',8)] # a farm of 4 instances in parallel is available on localhost, while a farm of 8 available on another machine
 ```
 
 Then start `ipython -i ddpg2.py`. The farmer should be able to reach the farm on your local machine. You can now type `r(100)` to train.
+
+if you want to use the farming code for other algorithms/purposes, please see `farming_demo.py` for an example.
 
 # Note for users on Win7 x64 + Python 3.5 (2017-07-06)
 
@@ -168,11 +170,11 @@ Update: this is not the goto choice since it introduce bias. your agent may not 
 # Visualize in environments without a graphic card (i.e. on cloud)
 
 - Windows users:
-    - download precompiled Mesa3D for Windows at <https://github.com/pal1000/mesa-dist-win/releases>. 
-    - Self-extract that on your remote machine, in my case Windows Server 2008 R2. 
-    
-    - Run the extracted `quickdeploy.cmd`. I installed `opensim` for Py27 via a conda package built by kidzik (as per instructions on github/stanfordnmbl/osim-rl/README), into a conda virtual environment called `osrl`, therefore the `simbody-visualizer.exe` is located in `c:\programdata\miniconda3\envs\osrl\`. Paste that path into the CMD window and let the `quickdeploy.cmd` do the rest for you. 
+    - download precompiled Mesa3D for Windows at <https://github.com/pal1000/mesa-dist-win/releases>.
+    - Self-extract that on your remote machine, in my case Windows Server 2008 R2.
+
+    - Run the extracted `quickdeploy.cmd`. I installed `opensim` for Py27 via a conda package built by kidzik (as per instructions on github/stanfordnmbl/osim-rl/README), into a conda virtual environment called `osrl`, therefore the `simbody-visualizer.exe` is located in `c:\programdata\miniconda3\envs\osrl\`. Paste that path into the CMD window and let the `quickdeploy.cmd` do the rest for you.
     - Now you can start RunEnv(visualize=True) without getting any errors! Mesa3D just emulated OpenGL for you.
-    
+
 - Linux users:
     - Not much I could help, but the approach should be the same: if OpenGL is not supported, emulate it.
