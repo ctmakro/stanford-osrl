@@ -34,7 +34,7 @@ observation:
 4 vx
 5 vy
 
-6-11 hip_r .. ankle_l [joint angles]
+6-11 hip_r .. ankle_l [joint angles] # 7->knee_r, 10->knee_l
 
 12-17 hip_r .. ankle_l [joint velocity]
 
@@ -106,7 +106,7 @@ def process_observation(observation):
     for i in range(6,18):
         o[i]/=4
 
-    o = o + [o[22+i*2+1]-0.5 for i in range(7)] # a copy of original y, not relative y.
+    o = o + [o[22+i*2+1]-0.9 for i in range(7)] # a copy of original y, not relative y.
 
     # x and y relative to pelvis
     for i in range(7): # head pelvis torso, toes and taluses
@@ -118,20 +118,23 @@ def process_observation(observation):
     o[20] -= pvx # mass vel xy made relative
     o[21] -= pvy
 
-    o[38]= min(4,o[38])/2 # ball info are included later in the stage
+    # o[38]= min(6,o[38])/7 # ball info are included later in the stage
+    o[38]=0
+    o[39]=0
+    o[40]=0
     # o[39]/=5
     # o[40]/=5
 
     o[0]/=2 # divide pr by 4
-    o[1]=0 # abs value of pel x is not relevant
-    o[2]-= 0.5 # minus py by 0.5
+    o[1]=0 # abs value of pel x should not be included
+    o[2]-= 0.9 # minus py by 0.5
 
-    o[3] /=2 # divide pvr by 4
-    o[4] /=10 # divide pvx by 10
-    o[5] /=10
+    o[3] /=4 # divide pvr by 4
+    o[4] /=8 # divide pvx by 10
+    o[5] /=1 # pvy is okay
 
-    o[20]/=10
-    o[21]/=10
+    o[20]/=1
+    o[21]/=1
 
     return o
 
@@ -139,7 +142,7 @@ _stepsize = 0.01
 flatten = lambda l: [item for sublist in l for item in sublist]
 
 # expand observation from 48 to 48*7 dims
-processed_dims = 48 + 14*1 + 9*1 + 1*0 + 8
+processed_dims = 48 + 14*1 + 3*2 + 1*0 + 8
 # processed_dims = 41*8
 def generate_observation(new, old=None, step=None):
 
@@ -201,8 +204,8 @@ def generate_observation(new, old=None, step=None):
         for t in [0,]]
     # [[14]]
 
-    fv = [v/10 for v in flatten(vels)]
-    frv = [rv/10 for rv in flatten(relvels)]
+    fv = [(v/8 if (idx%2==0) else v/1) for idx,v in enumerate(flatten(vels))]
+    frv = [(rv/8 if (idx%2==0) else rv/1) for idx,rv in enumerate(flatten(relvels))]
     fa = [a/10 for a in flatten(accs)]
     final_observation = new_processed + frv
     # final_observation = new_processed + fv + frv + fa
@@ -215,8 +218,13 @@ def generate_observation(new, old=None, step=None):
     # # 48*4
 
     balls = old['balls']
+    ball_ahead = True
+    if new[38] == 100:
+        # if no ball ahead
+        ball_ahead = False
 
     def addball_if_new():
+        nonlocal ball_ahead
         current_pelvis = new[1]
         current_ball_relative = new[38]
         current_ball_height = new[39]
@@ -242,11 +250,12 @@ def generate_observation(new, old=None, step=None):
                     q.dump(reason='ballcloser')
                     raise Exception('new ball closer than the old ones.')
 
-            balls.append([
-                absolute_ball_pos,
-                current_ball_height,
-                current_ball_radius,
-            ])
+            if ball_ahead:
+                balls.append([
+                    absolute_ball_pos,
+                    current_ball_height,
+                    current_ball_radius,
+                ])
             if len(balls)>3:
                 # edit: since num_of_balls became 10, this check is removed.
                 pass
@@ -266,7 +275,7 @@ def generate_observation(new, old=None, step=None):
 
     # there should be at most 3 balls
     # edit: there could be as much as 10 balls
-    for i in range(3):
+    for i in range(2):
         if i<len(balls):
             idx = len(balls)-1-i
             # one ball: [0th none none]
@@ -277,16 +286,26 @@ def generate_observation(new, old=None, step=None):
             rel = balls[idx][0] - current_pelvis
             falloff = min(1,max(0,3-abs(rel))) # when ball is closer than 3 falloff become 1
             ball_vectors.append([
-                min(4,max(-3, rel))/3 * falloff, # ball pos relative to current pos
+                min(8,max(-3, rel))/7, # ball pos relative to current pos
                 balls[idx][1] * 5 * falloff, # radius
                 balls[idx][2] * 5 * falloff, # height
             ])
         else:
             ball_vectors.append([
-                0,
+                -3/7,
                 0,
                 0,
             ])
+
+    if ball_ahead:
+        pass
+    else:
+        ball_vectors.append([
+        8/7,
+        0,
+        0,
+        ])
+        ball_vectors = ball_vectors[1:]
 
     # 9-d
     final_observation += flatten(reversed(ball_vectors))
@@ -304,8 +323,8 @@ def generate_observation(new, old=None, step=None):
     foot_touch_indicators = []
     for i in [29,31,33,35]: # y of toes and taluses
         # touch_ind = 1 if new[i] < 0.05 else 0
-        touch_ind = np.clip(0.05 - new[i] * 10 + 0.5, 0., 1.)
-        touch_ind2 = np.clip(0.1 - new[i] * 10 + 0.5, 0., 1.)
+        touch_ind = np.clip((0.0 - new[i]) * 5 + 0.5, 0., 1.)
+        touch_ind2 = np.clip((0.1 - new[i]) * 5 + 0.5, 0., 1.)
         # touch_ind2 = 1 if new[i] < 0.1 else 0
         foot_touch_indicators.append(touch_ind)
         foot_touch_indicators.append(touch_ind2)
