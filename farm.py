@@ -21,6 +21,81 @@ def bind_alternative_pelvis_judgement(runenv):
 def use_alternative_episode_length(runenv):
     runenv.spec.timestep_limit = 2000
 
+def runenv_with_alternative_obstacle_generation_scheme():
+    from osim.env import RunEnv
+    try:
+        from rosetta import tacos,psoas # check if rosetta.py exists.
+    except:
+        return RunEnv
+    finally:
+        pass
+
+    class RunEnv2(RunEnv):
+        def generate_env(self, difficulty, seed, max_obstacles):
+            import numpy as np
+            # if seed is not None:
+            #     np.random.seed(seed) # seed the RNG if seed is provided
+
+            # obstacles
+            num_obstacles = 0
+            xs = []
+            ys = []
+            rs = []
+
+            num_episodes = len(psoas)
+            num_obstacles = int(len(tacos)/num_episodes)
+            record_index = np.random.choice(num_episodes)
+            print('num_obstacles',num_obstacles,'num_episodes',num_episodes)
+
+            if 0 < difficulty:
+                # num_obstacles = min(3, max_obstacles)
+                # xs = np.random.uniform(1.0, 5.0, num_obstacles)
+                # ys = np.random.uniform(-0.25, 0.25, num_obstacles)
+                # rs = [0.05 + r for r in np.random.exponential(0.05, num_obstacles)]
+                for n in range(num_obstacles):
+                    x = tacos[record_index*num_obstacles+n][0]
+                    y = tacos[record_index*num_obstacles+n][1]
+                    r = tacos[record_index*num_obstacles+n][2]
+                    xs.append(x)
+                    ys.append(y)
+                    rs.append(r)
+
+
+            # if 0 < difficulty and 3 < max_obstacles:
+            #     extra_obstacles = max(min(20, max_obstacles) - num_obstacles, 0)
+            #     xs = np.concatenate([xs,(np.cumsum(np.random.uniform(2.0, 4.0, extra_obstacles)) + 5)])
+            #     ys = np.concatenate([ys,np.random.uniform(-0.05, 0.25, extra_obstacles)])
+            #     rs = rs + [0.05 + r for r in np.random.exponential(0.05, extra_obstacles)]
+            #     num_obstacles = len(xs)
+
+            # ys = map(lambda xy: xy[0]*xy[1], list(zip(ys, rs)))
+
+            # muscle strength
+            rpsoas = 1
+            lpsoas = 1
+            if difficulty >= 2:
+                # rpsoas = 1 - np.random.normal(0, 0.1)
+                # lpsoas = 1 - np.random.normal(0, 0.1)
+                # rpsoas = max(0.5, rpsoas)
+                # lpsoas = max(0.5, lpsoas)
+                lpsoas = psoas[record_index][0]
+                rpsoas = psoas[record_index][1]
+
+            muscles = [1] * 18
+
+            # modify only psoas
+            muscles[self.MUSCLES_PSOAS_R] = rpsoas
+            muscles[self.MUSCLES_PSOAS_L] = lpsoas
+
+            obstacles = list(zip(xs,ys,rs))
+            obstacles.sort()
+
+            return {
+                'muscles': muscles,
+                'obstacles': obstacles
+            }
+    return RunEnv2
+
 # separate process that holds a separate RunEnv instance.
 # This has to be done since RunEnv() in the same process result in interleaved running of simulations.
 def standalone_headless_isolated(pq, cq, plock):
@@ -30,6 +105,7 @@ def standalone_headless_isolated(pq, cq, plock):
     try:
         import traceback
         from osim.env import RunEnv
+        RunEnv = runenv_with_alternative_obstacle_generation_scheme()
         e = RunEnv(visualize=False,max_obstacles=10)
         # bind_alternative_pelvis_judgement(e)
         # use_alternative_episode_length(e)
