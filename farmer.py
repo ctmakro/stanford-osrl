@@ -63,14 +63,19 @@ class remoteEnv:
         return ret
 
     def rel(self):
+        count = 0
         while True: # releasing is important, so
             try:
+                count+=1
                 self.fp.rel(self.id)
                 break
             except Exception as e:
                 self.pretty('exception caught on rel()')
                 self.pretty(e)
                 time.sleep(3)
+                if count>5:
+                    self.pretty('failed to rel().')
+                    break
                 pass
 
         self.fp._pyroRelease()
