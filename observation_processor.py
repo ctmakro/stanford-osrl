@@ -118,10 +118,10 @@ def process_observation(observation):
     o[20] -= pvx # mass vel xy made relative
     o[21] -= pvy
 
-    # o[38]= min(6,o[38])/7 # ball info are included later in the stage
-    o[38]=0
-    o[39]=0
-    o[40]=0
+    o[38]= min(6,o[38])/7 # ball info are included later in the stage
+    # o[38]=0
+    # o[39]=0
+    # o[40]=0
     # o[39]/=5
     # o[40]/=5
 
@@ -142,7 +142,7 @@ _stepsize = 0.01
 flatten = lambda l: [item for sublist in l for item in sublist]
 
 # expand observation from 48 to 48*7 dims
-processed_dims = 48 + 14*1 + 3*2 + 1*0 + 8
+processed_dims = 48 + 14*1 + 3*0 + 1*0 + 8
 # processed_dims = 41*8
 def generate_observation(new, old=None, step=None):
 
@@ -216,7 +216,7 @@ def generate_observation(new, old=None, step=None):
     # )
     # # 4 * 5
     # # 48*4
-
+    '''
     balls = old['balls']
     ball_ahead = True
     if new[38] == 100:
@@ -284,7 +284,7 @@ def generate_observation(new, old=None, step=None):
             # 4 balls: [3rd 2nd 1st]
 
             rel = balls[idx][0] - current_pelvis
-            falloff = min(1,max(0,3-abs(rel))) # when ball is closer than 3 falloff become 1
+            falloff = min(1,max(0,(5-abs(rel-3)))) # when ball is closer than 7 falloff become 1
             ball_vectors.append([
                 min(8,max(-3, rel))/7, # ball pos relative to current pos
                 balls[idx][1] * 5 * falloff, # radius
@@ -309,12 +309,13 @@ def generate_observation(new, old=None, step=None):
 
     # 9-d
     final_observation += flatten(reversed(ball_vectors))
-
+    '''
     # episode_end_indicator = max(0, (step/1000-0.6))/10 # lights up when near end-of-episode
     # final_observation[1] = episode_end_indicator
     #
     # final_observation += [episode_end_indicator]
 
+    current_pelvis = new[1]
     flat_ahead_indicator = np.clip((current_pelvis - 5.0)/2, 0.0, 1.0)
     # # 0 at 5m, 1 at 7m
     #
