@@ -20,9 +20,9 @@ def playonce(env):
     ob = env.reset()
     step = 0
     for i in range(500):
-        o,r,d,_ = env.step(np.random.uniform(size=(18,)))
+        o,r,d,_ = env.step([j for j in np.random.uniform(size=(18,))])
         step+=1
-        print('envid',env.id,'step',step)
+        print('envid',env.custom_id,'step',step)
         if d:
             break
 
@@ -36,7 +36,7 @@ def play_ignore(env):
     # ignore and return, let the thread run for itself.
 
 # acquire the env from farm.
-def playifavailable(id):
+def playifavailable(cid):
     while True:
         remote_env = farmer.acq_env()
         # just replace occurences of env = RunEnv() with the line above.
@@ -47,7 +47,7 @@ def playifavailable(id):
             # time.sleep(0.1)
             pass
         else:
-            remote_env.id = id
+            remote_env.custom_id = cid
             play_ignore(remote_env)
             break
 
