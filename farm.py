@@ -106,7 +106,7 @@ def standalone_headless_isolated(pq, cq, plock):
         import traceback
         from osim.env import RunEnv
         RunEnv = runenv_with_alternative_obstacle_generation_scheme()
-        e = RunEnv(visualize=False,max_obstacles=0)
+        e = RunEnv(visualize=False,max_obstacles=10)
         # bind_alternative_pelvis_judgement(e)
         # use_alternative_episode_length(e)
     except Exception as e:
@@ -142,7 +142,7 @@ def standalone_headless_isolated(pq, cq, plock):
             #     raise Exception('pipe message received by headless is not a tuple')
 
             if msg[0] == 'reset':
-                o = e.reset(difficulty=0)
+                o = e.reset(difficulty=2)
                 # conn.send(floatify(o))
                 cq.put(floatify(o))
                 # conn.put(floatify(o))
