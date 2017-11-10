@@ -44,7 +44,7 @@ class nnagent(object):
     train_multiplier=1,
     ):
         self.rpm = rpm(1000000) # 1M history
-        self.plotter = plotter(num_lines=4)
+        self.plotter = plotter(num_lines=5)
         self.render = True
         self.training = True
         self.noise_source = one_fsq_noise()
@@ -191,25 +191,27 @@ class nnagent(object):
         # rect = Act('relu')
         # magic = 2
         # rect = Act('elu')
+        rect = Act('selu')
+        magic = 1
         def d(i,o):
             return LayerNormDense(i,o,stddev=magic)
             # return Dense(i,o,stddev=magic)
 
         c = Can()
         # c.add(self.create_common_network(inputdims,64))
-        c.add(d(inputdims,256))
+        c.add(d(inputdims,128))
         c.add(rect)
         # c.add(BatchNorm(512))
-        c.add(d(256,128))
+        c.add(d(128,128))
         c.add(rect)
         # # c.add(BatchNorm(128))
-        c.add(d(128,128))
+        c.add(d(128,64))
         c.add(rect)
-        c.add(d(128,128))
+        c.add(d(64,64))
         c.add(rect)
         # c.add(d(64,64))
         # c.add(rect)
-        c.add(Dense(128,outputdims,stddev=1))
+        c.add(Dense(64,outputdims,stddev=1))
 
         if self.is_continuous:
             c.add(Act('tanh'))
@@ -228,22 +230,23 @@ class nnagent(object):
         # magic = 1 # we already have layernorm
         # rect = Act('relu')
         # magic = 2
+        rect = Act('selu')
+        magic = 1
         def d(i,o):
             return LayerNormDense(i,o,stddev=magic)
             # return Dense(i,o,stddev=magic)
-#
 
         c = Can()
         concat = Lambda(lambda x:tf.concat(x,axis=1))
 
         # concat state and action
-        den0 = c.add(d(inputdims,256))
+        den0 = c.add(d(inputdims,128))
         # den1 = c.add(Dense(256, 128))
-        den2 = c.add(d(256+actiondims, 128))
-        den3 = c.add(d(128,128))
+        den2 = c.add(d(128+actiondims, 128))
+        den3 = c.add(d(128,64))
         # den3a = c.add(d(128,64))
-        den3b = c.add(d(128,128))
-        den4 = c.add(Dense(128,1,stddev=1))
+        den3b = c.add(d(64,64))
+        den4 = c.add(Dense(64,1,stddev=1))
 
         def call(i):
             state = i[0]
@@ -328,7 +331,7 @@ class nnagent(object):
         opt_critic = tf.train.AdamOptimizer(3e-4)
         # # opt_actor = tf.train.RMSPropOptimizer(1e-3)
         # # opt_critic = tf.train.RMSPropOptimizer(1e-3)
-        opt = tf.train.AdamOptimizer(3e-4)
+        opt = tf.train.AdamOptimizer(3e-5)
         opt_actor,opt_critic = opt,opt
         cstep = opt_critic.minimize(critic_loss+decay_c, var_list=cw)
         astep = opt_actor.minimize(actor_loss+decay_a, var_list=aw)
@@ -369,7 +372,7 @@ class nnagent(object):
         epochs = 1
 
         # self.lock.acquire()
-        if memory.size() > total_size * 32:
+        if memory.size() > 2000:
 
             #if enough samples in memory
             for i in range(self.train_multiplier):
@@ -388,7 +391,7 @@ class nnagent(object):
     def play(self,env,max_steps=-1,realtime=False,noise_level=0.): # play 1 episode
         timer = time.time()
         noise_source = one_fsq_noise()
-        noise_source.skip = 1 # freq adj
+        noise_source.skip = 4 # freq adj
 
         for j in range(200):
             noise_source.one((self.outputdims,),noise_level)
@@ -396,6 +399,7 @@ class nnagent(object):
         max_steps = max_steps if max_steps > 0 else 50000
         steps = 0
         total_reward = 0
+        total_q = 0
         episode_memory = []
 
         # removed: state stacking
@@ -421,11 +425,11 @@ class nnagent(object):
             # phased_noise_amplitude = max(0.1,np.sin(phased_noise_amplitude))
 
             phased_noise_amplitude = ((-noise_phase-steps)%phased_noise_anneal_duration)/phased_noise_anneal_duration
-            phased_noise_amplitude = max(0,phased_noise_amplitude*2-1)
-            phased_noise_amplitude = max(0.01,phased_noise_amplitude**2)
+            # phased_noise_amplitude = max(0,phased_noise_amplitude*2-1)
+            # phased_noise_amplitude = max(0.01,phased_noise_amplitude**2)
 
-            exploration_noise = noise_source.one((self.outputdims,),noise_level)*phased_noise_amplitude
-            # exploration_noise = np.random.normal(size=(self.outputdims,))*noise_level*phased_noise_amplitude
+            # exploration_noise = noise_source.one((self.outputdims,),noise_level)*phased_noise_amplitude
+            exploration_noise = np.random.normal(size=(self.outputdims,))*noise_level*phased_noise_amplitude
             # exploration_noise -= noise_level * 1
 
             # exploration_noise = np.random.normal(size=(self.outputdims,))*0.
@@ -440,8 +444,9 @@ class nnagent(object):
             # exploration_noise = exploration_noise*(1-shot_noise_replace) + shot_noise_amplitude*shot_noise_replace
 
             # self.lock.acquire() # please do not disrupt.
-            action = self.act(observation_before_action, exploration_noise) # a1
+            action,q = self.act(observation_before_action, exploration_noise) # a1
             # self.lock.release()
+            total_q+=q
 
             if self.is_continuous:
                 # add noise to our actions, since our policy by nature is deterministic
@@ -497,7 +502,7 @@ class nnagent(object):
         #     if np.random.uniform()>0.5:
         #         self.feed_one(t)
 
-        self.plotter.pushys([total_reward,noise_level,(time.time()%3600)/3600-2,steps/1000-1])
+        self.plotter.pushys([total_reward,noise_level,(time.time()%3600)/3600-2,steps/1000-1,total_q/steps+3])
         # self.noiseplotter.pushy(noise_level)
         self.lock.release()
 
@@ -526,7 +531,7 @@ class nnagent(object):
             self.loggraph(np.hstack([disp_actions,noise,q]))
             # self.lock.release()
             # temporarily disabled.
-        return actions
+        return actions,q
 
     def loggraph(self,waves):
         wg = self.wavegraph
@@ -568,10 +573,10 @@ if __name__=='__main__':
     train_multiplier=1,
     )
 
-    noise_level = 1
-    noise_decay_rate = 0.001
-    noise_floor = 0.1
-    noiseless = 0.01
+    noise_level = 2
+    noise_decay_rate = 0.005
+    noise_floor = 0
+    noiseless = 0.0001
 
     from farmer import farmer as farmer_class
     # from multi import fastenv
@@ -599,7 +604,7 @@ if __name__=='__main__':
 
         # global noise_level
         # env = farmer.acq_env()
-        fenv = fastenv(env,4) # 4 is skip factor
+        fenv = fastenv(env,3) # 4 is skip factor
         agent.play(fenv,realtime=False,max_steps=-1,noise_level=nl)
         # epl.rel_env(env)
         env.rel()
@@ -630,12 +635,13 @@ if __name__=='__main__':
                 print('(run) stop signal received, stop at ep',i+1)
                 break
 
-            # noise_level *= (1-noise_decay_rate)
-            noise_level -= noise_decay_rate
+            noise_level *= (1-noise_decay_rate)
+            # noise_level -= noise_decay_rate
             noise_level = max(noise_floor, noise_level)
 
             # nl = noise_level if np.random.uniform()>0.05 else noiseless
             nl = noise_level if i%20!=0 else noiseless
+            # nl = noise_level
             # nl = noise_level * np.random.uniform() + 0.01
 
             print('ep',i+1,'/',ep,'times:',times,'noise_level',nl)
@@ -645,14 +651,23 @@ if __name__=='__main__':
             time.sleep(0.05)
             # time.sleep(1)
 
-            if (i+1) % 1000 == 0:
+            if (i+1) % 2000 == 0:
                 # save the training result.
                 save()
 
-    def test():
+    def test(skip=1):
         # e = p.env
+        te = RunEnv(visualize=True,max_obstacles=10)
+        from multi import fastenv
+
+        fenv = fastenv(te,skip) # 4 is skip factor
         agent.render = True
-        agent.play(e,realtime=True,max_steps=-1,noise_level=1e-11)
+        try:
+            agent.play(fenv,realtime=True,max_steps=-1,noise_level=1e-11)
+        except:
+            pass
+        finally:
+            del te
 
     def save():
         agent.save_weights()
@@ -680,6 +695,7 @@ if __name__=='__main__':
         crowdai_token = apikey
 
         client = Client(remote_base)
+        ob_log = '' # string to log observations
 
         # Create environment
         observation = client.env_create(crowdai_token)
@@ -689,7 +705,11 @@ if __name__=='__main__':
         total_reward = 0
         old_observation = None
         def obg(plain_obs):
-            nonlocal old_observation, stepno
+            nonlocal old_observation, stepno, ob_log
+
+            # log csv observation into string
+            ob_log += ','.join([str(i) for i in plain_obs]) + '\n'
+
             processed_observation, old_observation = go(plain_obs, old_observation, step=stepno)
             return np.array(processed_observation)
 
@@ -700,7 +720,7 @@ if __name__=='__main__':
             proc_observation = obg(observation)
 
             [observation, reward, done, info] = client.env_step(
-                [float(i) for i in list(agent.act(proc_observation))],
+                [float(i) for i in list(agent.act(proc_observation)[0])],
                 True
             )
             stepno+=1
@@ -721,5 +741,9 @@ if __name__=='__main__':
 
         print('submitting...')
         client.submit()
+
+        print('saving to file...')
+        with open('sublog.csv','w') as f:
+            f.write(ob_log)
 
         # _stepsize = 0.04

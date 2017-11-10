@@ -118,12 +118,12 @@ def process_observation(observation):
     o[20] -= pvx # mass vel xy made relative
     o[21] -= pvy
 
-    o[38]= min(6,o[38])/7 # ball info are included later in the stage
+    o[38]= min(8,o[38])/7 # ball info are included later in the stage
     # o[38]=0
     # o[39]=0
     # o[40]=0
-    # o[39]/=5
-    # o[40]/=5
+    o[39]*=5
+    o[40]*=5
 
     o[0]/=2 # divide pr by 4
     o[1]=0 # abs value of pel x should not be included
@@ -142,7 +142,7 @@ _stepsize = 0.01
 flatten = lambda l: [item for sublist in l for item in sublist]
 
 # expand observation from 48 to 48*7 dims
-processed_dims = 48 + 14*1 + 3*0 + 1*0 + 8
+processed_dims = 48 + 14*1 + 3*3 + 1*0 + 8
 # processed_dims = 41*8
 def generate_observation(new, old=None, step=None):
 
@@ -216,7 +216,7 @@ def generate_observation(new, old=None, step=None):
     # )
     # # 4 * 5
     # # 48*4
-    '''
+
     balls = old['balls']
     ball_ahead = True
     if new[38] == 100:
@@ -275,7 +275,7 @@ def generate_observation(new, old=None, step=None):
 
     # there should be at most 3 balls
     # edit: there could be as much as 10 balls
-    for i in range(2):
+    for i in range(3):
         if i<len(balls):
             idx = len(balls)-1-i
             # one ball: [0th none none]
@@ -284,7 +284,8 @@ def generate_observation(new, old=None, step=None):
             # 4 balls: [3rd 2nd 1st]
 
             rel = balls[idx][0] - current_pelvis
-            falloff = min(1,max(0,(5-abs(rel-3)))) # when ball is closer than 7 falloff become 1
+            # falloff = min(1,max(0,(5-abs(rel-3)))) # when ball is closer than 7 falloff become 1
+            falloff = 1
             ball_vectors.append([
                 min(8,max(-3, rel))/7, # ball pos relative to current pos
                 balls[idx][1] * 5 * falloff, # radius
@@ -300,16 +301,16 @@ def generate_observation(new, old=None, step=None):
     if ball_ahead:
         pass
     else:
-        ball_vectors.append([
+        ball_vectors = [[
         8/7,
         0,
         0,
-        ])
-        ball_vectors = ball_vectors[1:]
+        ]] + ball_vectors
+        ball_vectors = ball_vectors[0:3]
 
     # 9-d
     final_observation += flatten(reversed(ball_vectors))
-    '''
+
     # episode_end_indicator = max(0, (step/1000-0.6))/10 # lights up when near end-of-episode
     # final_observation[1] = episode_end_indicator
     #

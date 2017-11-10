@@ -34,8 +34,22 @@ class fastenv:
         for j in range(self.skipcount):
             self.stepcount+=1
             oo,r,d,i = self.e.step(action)
+
+            headx = oo[22]
+            px = oo[1]
+            py = oo[2]
+            kneer = oo[7]
+            kneel = oo[10]
+
+            # height_penalty = max(0, 0.65-py) * 0.1
+            lean_penalty = min(0.3, max(0, px-headx-0.3)) * 0.03
+            joint_penalty = sum([max(0,k-0.1) for k in [kneer,kneel]]) * 0.02
+            penalty = lean_penalty + joint_penalty# + height_penalty
+            # action_penalty = np.mean(np.array(action))*1e-3
+            # penalty += action_penalty
+
             o = self.obg(oo)
-            sr += r
+            sr += r - penalty
 
             if d == True:
                 break
