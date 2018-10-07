@@ -181,8 +181,11 @@ class ppo_agent:
         gamma=0.99, lam=0.95,
         train_epochs=10, batch_size=64,
         buffer_length=10,
-        policy=None
+        policy=None,
+        lr=None
         ):
+        if lr is not None:
+            self.lr = lr
         if policy is None:
             print('no policy designated, use default Policy')
             policy = Policy
@@ -280,7 +283,7 @@ class ppo_agent:
 
         # optimizer
         opt = tf.train.AdamOptimizer(1e-4)
-        opt_a = tf.train.AdamOptimizer(3e-4)
+        opt_a = tf.train.AdamOptimizer(3e-4 if not hasattr(self,'lr') else self.lr)
         opt_c = tf.train.AdamOptimizer(1e-3)
 
         # sum of two losses used in original implementation
@@ -529,7 +532,7 @@ class ppo_agent:
                 nd.shape += (1,)
 
         # standarize/normalize
-        advantage = (advantage - advantage.mean())/(advantage.std()+1e-3)
+        advantage = (advantage - advantage.mean())/(advantage.std()+1e-4)
 
         return s1,a1,r1,done,advantage,tdlamret
 

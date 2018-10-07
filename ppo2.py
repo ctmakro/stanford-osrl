@@ -38,6 +38,9 @@ class SingleEnvSampler:
             ep = 0
             steps = 0
 
+            # to achieve better exploration, cut the frequency a bit
+            last_action = None
+
             while 1:
                 try: # catch every possible error
                     # episode start
@@ -49,6 +52,17 @@ class SingleEnvSampler:
                     while 1:
                         # sample action from given policy
                         mean, sto, val_pred = self.agent.act(ob)
+
+                        # action frequency cutter
+                        if last_action is None:
+                            last_action = mean,sto
+                        freq_cut_param = self.agent.freq_cut_param
+                        stay = (np.random.uniform(size=mean.shape)<freq_cut_param).astype('float32')
+                        mean,sto = [l*stay+c*(1.-stay) for l,c in zip(last_action, [mean,sto])]
+
+                        last_action = mean,sto
+                        # end action freq cutter
+
                         # policy_out, val_pred = self.act(ob)
                         # sto_action = 1.0*(policy_out > noise_sample())
                         sto_action = sto

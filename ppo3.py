@@ -9,7 +9,7 @@ import gym
 import threading as th
 import math, time
 
-from ppo import MultiCategoricalContinuous
+from ppo import MultiCategoricalContinuous,Bernoulli
 from ppo2 import ppo_agent2, SingleEnvSampler, flatten
 from triggerbox import TriggerBox
 from farmer import farmer as farmer_class
@@ -52,25 +52,29 @@ class AwesomePolicy(Can):
         magic = 1/(0.5+0.5*0.2) # stddev factor for lrelu(0.2)
 
         c = Can()
-        c.add(Dense(ob_dims, 128, stddev=magic))
+        c.add(Dense(ob_dims, 256, stddev=magic))
         c.add(rect)
-        c.add(Dense(128, 64, stddev=magic))
+        c.add(Dense(256, 128, stddev=magic))
         c.add(rect)
-        c.add(Dense(64, 64, stddev=magic))
+        c.add(Dense(128, 128, stddev=magic))
         c.add(rect)
-        c.add(Dense(64, ac_dims*3, stddev=1))
-        # self.dist = c.add(Bernoulli())
-        self.dist = c.add(MultiCategoricalContinuous(ac_dims, 3))
+        c.add(Dense(128, 128, stddev=magic))
+        c.add(rect)
+        c.add(Dense(128, ac_dims, stddev=1))
+        self.dist = c.add(Bernoulli())
+        # self.dist = c.add(MultiCategoricalContinuous(ac_dims, 5))
         c.chain()
         self.actor = self.add(c)
 
         # 3. build our value network
         c = Can()
-        c.add(Dense(ob_dims, 128, stddev=magic))
+        c.add(Dense(ob_dims, 256, stddev=magic))
+        c.add(rect)
+        c.add(Dense(256, 128, stddev=magic))
+        c.add(rect)
+        c.add(Dense(128, 128, stddev=magic))
         c.add(rect)
         c.add(Dense(128, 64, stddev=magic))
-        c.add(rect)
-        c.add(Dense(64, 64, stddev=magic))
         c.add(rect)
         c.add(Dense(64, 1, stddev=1))
         c.chain()
@@ -99,30 +103,38 @@ if __name__ == '__main__':
 
     agent = ppo_agent2(
         ob_space, runenv.action_space,
-        horizon=128, # minimum steps to collect before policy update
+        horizon=256, # minimum steps to collect before policy update
         gamma=0.99, # discount factor for reward
-        lam=0.95, # smooth factor for advantage estimation
+        lam=0.98, # smooth factor for advantage estimation
         train_epochs=10, # how many epoch over data for one update
         batch_size=128, # batch size for training
-        buffer_length=16,
+        buffer_length=2,
 
+        lr=3e-4,
         policy=AwesomePolicy
     )
 
     get_session().run(gvi()) # init global variables for TF
 
     # parallelized
-    process_count = 16 # total horizon = process_count * agent.horizon
+    process_count = 24 # total horizon = process_count * agent.horizon
     samplers = [DisposingSampler(agent) for i in range(process_count)]
 
+    freq_cut_param = 0.9
+
     def r(iters=2):
-        global stopsimflag
+        global stopsimflag,freq_cut_param
         print('start running')
         for i in range(iters):
             if stopsimflag:
                 stopsimflag = False
                 print('(run) stop signal received, stop at iter',i+1)
                 break
+
+            freq_cut_param = freq_cut_param*0.99
+            print('freq_cut_param:{:4.4f}'.format(freq_cut_param))
+            agent.freq_cut_param = freq_cut_param
+
             print('optimization iteration {}/{}'.format(i+1, iters))
             # agent.iterate_once(env)
             agent.iterate_once_on_samplers(samplers)
